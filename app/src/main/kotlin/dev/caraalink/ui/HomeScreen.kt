@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,6 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,11 +55,13 @@ import dev.caraalink.connection.CarLink
 import dev.caraalink.connection.ConnectionSnapshot
 import dev.caraalink.connection.ConnectionStateHolder
 import dev.caraalink.connection.WirelessPhase
+import dev.caraalink.diagnostics.DiagnosticLogger
 import dev.caraalink.service.UsbLinkForegroundService
 import dev.caraalink.settings.AppSettings
 import dev.caraalink.ui.theme.Dash
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val SERVER_POLL_MS = 2_000L
@@ -216,6 +220,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
             }
             Spacer(Modifier.height(16.dp))
             HomeActions(state, connection, onOpenNearby)
+            SendLogsLink()
         }
     }
 }
@@ -238,6 +243,21 @@ private fun HomeActions(state: HomeState, connection: ConnectionSnapshot, onOpen
             AmberButton(stringResource(R.string.home_wifi_settings), { context.startActivity(Intent(Settings.Panel.ACTION_WIFI)) })
             Spacer(Modifier.height(4.dp))
             DashLink(stringResource(R.string.home_try_again)) { retryWireless(context, connection) }
+        }
+    }
+}
+
+/** Zips the logs and opens the share sheet, so a tester far away can send them over any chat app. */
+@Composable
+private fun SendLogsLink() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    Spacer(Modifier.height(4.dp))
+    DashLink(stringResource(R.string.home_send_logs)) {
+        scope.launch {
+            runCatching { withContext(Dispatchers.IO) { DiagnosticLogger(context, "app").shareAllLogsIntent() } }
+                .onSuccess { context.startActivity(Intent.createChooser(it, null)) }
+                .onFailure { Toast.makeText(context, it.toString(), Toast.LENGTH_LONG).show() }
         }
     }
 }

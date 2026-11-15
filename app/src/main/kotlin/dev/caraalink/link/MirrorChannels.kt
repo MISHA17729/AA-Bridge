@@ -15,9 +15,11 @@ data class CaptureConfig(
     val orientation: Int,
     val displayId: Int,
     val supportExtendProtocol: Int,
+    /** CarbitLink sizes go down to a multiple of 16. QDLink only rounds to even. */
+    val align: Int = 16,
 ) {
-    val encodeWidth get() = width and 15.inv()
-    val encodeHeight get() = height and 15.inv()
+    val encodeWidth get() = width and (align - 1).inv()
+    val encodeHeight get() = height and (align - 1).inv()
 
     companion object {
         fun parse(b: ByteArray): CaptureConfig {

@@ -13,4 +13,7 @@
     <usb-accessory
         manufacturer="Carbit"
         model="CarbitDriverOversea" />
+    <usb-accessory
+        manufacturer="Neusoft"
+        model="QDriveLink" />
 </resources>

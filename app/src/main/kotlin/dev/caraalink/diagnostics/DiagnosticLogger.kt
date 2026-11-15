@@ -14,6 +14,8 @@ import java.util.Locale
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /**
  * Writes timestamped lines to ONE shared, app-wide log file (no more
@@ -54,6 +56,28 @@ class DiagnosticLogger(private val context: Context, private val tag: String) {
         return Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    }
+
+    /** Zips every log file and builds a share-sheet [Intent], so a tester can send them from any chat app. */
+    fun shareAllLogsIntent(): Intent {
+        latestLogFile()
+        val dir = File(context.cacheDir, "reports").apply { mkdirs() }
+        dir.listFiles()?.forEach { it.delete() }
+        val zip = File(dir, "AABridge-logs-${SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())}.zip")
+        ZipOutputStream(zip.outputStream()).use { out ->
+            logDir(context).listFiles()?.sortedBy { it.name }?.forEach { f ->
+                out.putNextEntry(ZipEntry(f.name))
+                f.inputStream().use { it.copyTo(out) }
+                out.closeEntry()
+            }
+        }
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", zip)
+        return Intent(Intent.ACTION_SEND).apply {
+            type = "application/zip"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, zip.name)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
     }

@@ -37,7 +37,9 @@ class CarVideoEncoder(
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 3)
             setLong(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, 100_000L)
             setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
-            setInteger(MediaFormat.KEY_LEVEL, MediaCodecInfo.CodecProfileLevel.AVCLevel31)
+            // 1920-wide frames exceed Level 3.1. QDLink 1.9.8 switches to 4.0 there too.
+            val level = if (maxOf(width, height) >= 1920) MediaCodecInfo.CodecProfileLevel.AVCLevel4 else MediaCodecInfo.CodecProfileLevel.AVCLevel31
+            setInteger(MediaFormat.KEY_LEVEL, level)
             setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
         }
         val callback = object : MediaCodec.Callback() {
