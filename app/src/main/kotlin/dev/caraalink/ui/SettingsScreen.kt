@@ -81,6 +81,7 @@ fun SettingsScreen(onBack: () -> Unit, onHelp: () -> Unit, onAbout: () -> Unit) 
                 context.startActivity(Intent(context, SettingsActivity::class.java))
             }
         }
+        Byline(Modifier.padding(horizontal = 24.dp, vertical = 16.dp))
     }
 }
 

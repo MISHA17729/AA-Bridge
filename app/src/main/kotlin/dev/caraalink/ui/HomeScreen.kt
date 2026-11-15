@@ -97,14 +97,16 @@ private fun rememberConnection(): ConnectionSnapshot {
 /** The wordmark on screens without the settings gear. */
 @Composable
 fun BrandBar(modifier: Modifier = Modifier) {
-    Text(
-        stringResource(R.string.app_name).uppercase(),
-        modifier = modifier.padding(horizontal = 24.dp, vertical = 18.dp),
-        color = Dash.Teal,
-        fontSize = 13.sp,
-        fontWeight = FontWeight.ExtraBold,
-        letterSpacing = 1.5.sp,
-    )
+    Column(modifier.padding(horizontal = 24.dp, vertical = 18.dp)) {
+        Text(
+            stringResource(R.string.app_name).uppercase(),
+            color = Dash.Teal,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 1.5.sp,
+        )
+        Byline()
+    }
 }
 
 /** Starts the wireless search: the remembered car, or [address] when the driver picked one. */

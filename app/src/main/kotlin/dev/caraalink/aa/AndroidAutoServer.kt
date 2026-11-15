@@ -55,6 +55,7 @@ object AndroidAutoServer {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_bridge)
             .setContentTitle(context.getString(title))
+            .setSubText(context.getString(R.string.made_by))
             .setContentText(context.getString(text))
             .setStyle(NotificationCompat.BigTextStyle().bigText(context.getString(text)))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
