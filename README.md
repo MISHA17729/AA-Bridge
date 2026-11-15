@@ -2,7 +2,7 @@
   <img src="docs/logo.svg" alt="AA Bridge" width="480" />
 </p>
 
-AA Bridge brings Android Auto to cars whose screen only supports CarbitLink (also called EasyConnection) phone mirroring.
+AA Bridge brings Android Auto to cars whose screen only supports CarbitLink (also called EasyConnection) or QDLink phone mirroring.
 
 The app runs on your phone. It starts a local Android Auto session and sends it to the car, over a USB cable or wirelessly over Wi-Fi Direct. Touches on the car screen go back to Android Auto.
 
@@ -24,14 +24,14 @@ The app runs on your phone. It starts a local Android Auto session and sends it 
 
 ## Will it work in my car?
 
-- **Tested:** 2026 Geely Emgrand (Egypt, head unit EC-KY-4350), over cable and wireless. One other CarbitLink head unit over cable.
+- **Tested:** 2026 Geely Emgrand (Egypt, head unit EC-KY-4350), over cable and wireless. One other CarbitLink head unit over cable. A 2026 Geely Emgrand with QDLink over cable.
 - **Likely to work:** cars from Geely, Chery, Jetour, BAIC, JAC, GAC and Proton whose screen has CarbitLink, EasyConnection or a "phone link" app. This list comes from adapter listings and owner guides, not from our own tests.
 - **Tried it in your car?** Open an [issue](../../issues) with the car model and year, the name of the phone-link app on the car screen, cable or wireless, and whether it worked.
 
 ## What you need
 
 - An Android 10 or newer phone with Android Auto
-- A car whose screen has CarbitLink or EasyConnection
+- A car whose screen has CarbitLink, EasyConnection or QDLink
 - A USB data cable, or Wi-Fi turned on for wireless
 
 ## Download
@@ -60,11 +60,13 @@ Plugging in the cable while connected wirelessly switches over without restartin
 
 - **"Android Auto needs a tap":** Android Auto's server stops when the phone restarts. Tap the notification, then ⋮ and Start head unit server.
 - **Stuck on "Starting…":** go to Settings → Apps → Android Auto → Force stop, then start the server again.
+- **The QDLink app opens instead:** go to Settings → Apps → QDLink → Open by default, clear it, then plug in again and choose AA Bridge.
 - **Can't find your car:** make sure the car screen is on and showing the phone-link page, Wi-Fi is on, and the phone is close by.
 
 ## Known limits
 
 - Android Auto's developer mode is not an official feature, so an Android Auto update can break it.
+- QDLink cars work over cable only.
 
 ## Building
 
@@ -84,4 +86,4 @@ Based on [CarAALink](https://github.com/JObersi10/CarAALink) by JObersi10. The A
 
 GPL-3.0, see [LICENSE](LICENSE).
 
-Android Auto is a trademark of Google LLC. AA Bridge is not affiliated with Google or the makers of CarbitLink.
+Android Auto is a trademark of Google LLC. AA Bridge is not affiliated with Google or the makers of CarbitLink or QDLink.
