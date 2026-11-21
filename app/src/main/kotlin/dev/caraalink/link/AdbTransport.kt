@@ -111,7 +111,11 @@ class AdbTransport(
             // writing the zero kick immediately is the worst possible timing
             // to land in that window. Cheap and reversible; revert if it
             // makes no measurable difference to EIO frequency.
-            Thread.sleep(300)
+            try {
+                Thread.sleep(300)
+            } catch (_: InterruptedException) {
+                return@Thread // stop() interrupted the settle delay and already closed the transport.
+            }
             // Confirmed real (owner-captured log, 2026-11-09): when the
             // accessory has already vanished (physical USB-C disconnect at
             // the port level, not an app-layer issue), every one of
@@ -152,7 +156,7 @@ class AdbTransport(
                 return true
             } catch (e: IOException) {
                 logger.log("zero kick attempt ${attempt + 1} failed: ${e.message}")
-                Thread.sleep(20)
+                try { Thread.sleep(20) } catch (_: InterruptedException) { return false } // stopped mid-retry
             }
         }
         return false
