@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Process
-import android.util.Log
 import android.view.Surface
 
 /**
@@ -21,6 +20,8 @@ class CarVideoEncoder(
     private val fps: Int,
     private val bitRate: Int,
     private val onFrame: (data: ByteArray, isConfig: Boolean, isKey: Boolean) -> Unit,
+    /** The session log file; some phones (vivo) cut off the app's logcat seconds after launch. */
+    private val log: (String) -> Unit,
 ) {
     private val thread = HandlerThread("CarVideoEncoder", Process.THREAD_PRIORITY_URGENT_DISPLAY).also { it.start() }
     private val codec: MediaCodec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
@@ -64,16 +65,16 @@ class CarVideoEncoder(
                     }
                     codec.releaseOutputBuffer(index, false)
                 } catch (e: IllegalStateException) {
-                    Log.w(TAG, "output after release", e)
+                    if (!released) log("encoder output failed: $e")
                 }
             }
 
             override fun onError(codec: MediaCodec, e: MediaCodec.CodecException) {
-                Log.e(TAG, "encoder error", e)
+                log("encoder error: $e ${e.diagnosticInfo} recoverable=${e.isRecoverable} transient=${e.isTransient}")
             }
 
             override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {
-                Log.i(TAG, "format: $format")
+                log("encoder format: $format")
             }
         }
         val handler = Handler(thread.looper)
@@ -82,7 +83,7 @@ class CarVideoEncoder(
             codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         } catch (e: Exception) {
             // Some encoders reject the baseline/level/low-latency hints; retry plain.
-            Log.w(TAG, "configure with hints failed, retrying plain", e)
+            log("encoder configure with hints failed, retrying plain: $e")
             listOf(MediaFormat.KEY_PROFILE, MediaFormat.KEY_LEVEL, MediaFormat.KEY_LOW_LATENCY,
                 MediaFormat.KEY_PRIORITY, MediaFormat.KEY_OPERATING_RATE, QTI_LOW_LATENCY).forEach { format.removeKey(it) }
             codec.reset()
@@ -91,6 +92,7 @@ class CarVideoEncoder(
         }
         inputSurface = codec.createInputSurface()
         codec.start()
+        log("encoder started: ${codec.name} ${width}x$height ${fps}fps ${bitRate}bps")
     }
 
     fun requestKeyFrame() {
@@ -108,7 +110,6 @@ class CarVideoEncoder(
     }
 
     companion object {
-        private const val TAG = "CarVideoEncoder"
         /** Snapdragon encoders' own low-latency switch; other encoders ignore it. */
         private const val QTI_LOW_LATENCY = "vendor.qti-ext-enc-low-latency.enable"
     }

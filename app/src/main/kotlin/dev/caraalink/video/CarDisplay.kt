@@ -7,8 +7,8 @@ import android.hardware.display.VirtualDisplay
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.util.Log
 import android.view.Display
+import dev.caraalink.diagnostics.DiagnosticLogger
 import android.view.MotionEvent
 import android.view.Surface
 import android.view.WindowManager
@@ -25,6 +25,7 @@ class CarDisplay(
     enum class Mode { STATUS, AA }
 
     private val main = Handler(Looper.getMainLooper())
+    private val logger = DiagnosticLogger(context, "car-display")
     private var carDisplay: VirtualDisplay? = null
     private var presentation: Presentation? = null
     @Volatile var mode = Mode.STATUS
@@ -41,6 +42,7 @@ class CarDisplay(
         if (existing == null) {
             val dm = context.getSystemService(DisplayManager::class.java)
             carDisplay = dm.createVirtualDisplay("CarAALink", w, h, dpi, surface, 0)
+            if (carDisplay == null) logger.log("createVirtualDisplay returned null -- the car gets no picture")
         } else {
             existing.resize(w, h, dpi)
             existing.surface = surface
@@ -94,7 +96,7 @@ class CarDisplay(
                 }
             }.also { it.show() }
         } catch (e: WindowManager.InvalidDisplayException) {
-            Log.e(TAG, "presentation failed", e)
+            logger.log("presentation failed: $e")
             null
         }
     }
@@ -127,9 +129,5 @@ class CarDisplay(
         presentation = null
         carDisplay?.release()
         carDisplay = null
-    }
-
-    companion object {
-        private const val TAG = "CarDisplay"
     }
 }

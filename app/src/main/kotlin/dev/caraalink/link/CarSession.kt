@@ -405,7 +405,7 @@ class CarSession(
         }
         lastBitRate = bitRate
         encoder?.release()
-        val enc = CarVideoEncoder(config.encodeWidth, config.encodeHeight, fps, bitRate, ::onEncodedFrame)
+        val enc = CarVideoEncoder(config.encodeWidth, config.encodeHeight, fps, bitRate, ::onEncodedFrame, logger::log)
         try {
             enc.start()
         } catch (e: Exception) {
