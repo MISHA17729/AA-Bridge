@@ -116,7 +116,7 @@ class QdTransport(
     private val onClosed: (String) -> Unit,
 ) : CarTransport {
 
-    private val queue = LinkedBlockingQueue<ByteArray>()
+    private val queue = LinkedBlockingQueue<Queued>()
     private val backlog = AtomicInteger()
     private val closed = AtomicBoolean()
     private var writer: Thread? = null
@@ -157,10 +157,10 @@ class QdTransport(
         onClosed(reason)
     }
 
-    private fun send(frame: ByteArray) {
+    private fun send(frame: ByteArray, video: Boolean = false) {
         if (closed.get()) return
         backlog.addAndGet(frame.size)
-        queue.put(frame)
+        queue.put(Queued(frame, video))
     }
 
     private fun sendJson(msgType: Int, text: String, log: Boolean = true) {
@@ -175,8 +175,8 @@ class QdTransport(
         try {
             while (!closed.get()) {
                 val f = queue.take()
-                conn.output.write(f)
-                backlog.addAndGet(-f.size)
+                conn.output.write(f.bytes)
+                backlog.addAndGet(-f.bytes.size)
             }
         } catch (_: InterruptedException) {
         } catch (e: IOException) {
@@ -341,8 +341,8 @@ class QdTransport(
                     continue
                 }
                 // QDLink 1.9.8 sends SPS+PPS ahead of every frame over USB.
-                parameterSets?.let { send(videoFrame(it)) }
-                send(videoFrame(au))
+                parameterSets?.let { send(videoFrame(it), video = true) }
+                send(videoFrame(au), video = true)
                 framesSent++
                 videoBytes += n
                 if (framesSent <= 3) logger.log("QD video frame #$framesSent ($n bytes, nal ${QdFrames.nalType(au)})")
@@ -352,11 +352,11 @@ class QdTransport(
         private fun videoFrame(au: ByteArray) = QdFrames.frame(QdFrames.TYPE_VIDEO, QdFrames.FORMAT_H264, au,
             QdFrames.videoExt(carW, carH, encodingType, fps, bitRate, interval))
 
-        override fun backlogBytes() = backlog.get()
+        override fun backlogAgeMs() = queue.peek()?.ageMs() ?: 0L
 
+        // Heartbeats and replies stay queued; only video is dropped.
         override fun clearBacklog() {
-            queue.clear()
-            backlog.set(0)
+            queue.removeIf { q -> q.video.also { if (it) backlog.addAndGet(-q.bytes.size) } }
         }
     }
 

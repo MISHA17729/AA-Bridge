@@ -9,18 +9,14 @@ class FakeStream(override val localId: Int = 1) : MirrorStream {
     val written = mutableListOf<ByteArray>()
     override var closed = false
         private set
-    private var backlog = 0
 
     override fun write(data: ByteArray) {
         written.add(data)
-        backlog += data.size
     }
 
-    override fun backlogBytes(): Int = backlog
+    override fun backlogAgeMs(): Long = 0
 
-    override fun clearBacklog() {
-        backlog = 0
-    }
+    override fun clearBacklog() {}
 
     fun close() {
         closed = true

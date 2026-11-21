@@ -549,7 +549,7 @@ class CarSession(
                 pullQueue.add(data)
                 return
             }
-            if (stream.backlogBytes() > MAX_PUSH_BACKLOG) {
+            if (stream.backlogAgeMs() > MAX_PUSH_LAG_MS) {
                 if (!isKey) { waitingForKey = true; encoder?.requestKeyFrame(); return }
                 stream.clearBacklog()
             }
@@ -562,7 +562,8 @@ class CarSession(
         private const val APPSTATUS_BACKGROUND = 0x20030
         private const val MAX_PULL_QUEUE = 2
         private const val ENCODER_STALL_MS = 200L
-        private const val MAX_PUSH_BACKLOG = 2 * 1024 * 1024
+        /** A frame queued longer than this means the car fell behind: skip ahead to a fresh keyframe. */
+        private const val MAX_PUSH_LAG_MS = 150L
         private const val AA_WATCHDOG_CHECK_MS = 5_000L
         private const val AA_WATCHDOG_STALL_MS = 10_000L
         private const val AA_WATCHDOG_STARTUP_MS = 60_000L

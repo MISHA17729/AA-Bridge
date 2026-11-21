@@ -104,8 +104,7 @@ class SocketTransport(
     }
 
     inner class SocketStream(override val localId: Int, val socket: Socket) : MirrorStream {
-        private val queue = LinkedBlockingQueue<ByteArray>()
-        private val queued = AtomicInteger(0)
+        private val queue = LinkedBlockingQueue<Queued>()
         @Volatile override var closed = false
             private set
 
@@ -113,9 +112,7 @@ class SocketTransport(
             try {
                 val out = socket.getOutputStream()
                 while (!closed) {
-                    val chunk = queue.take()
-                    queued.addAndGet(-chunk.size)
-                    out.write(chunk)
+                    out.write(queue.take().bytes)
                 }
             } catch (_: InterruptedException) {
             } catch (e: IOException) {
@@ -126,16 +123,12 @@ class SocketTransport(
 
         override fun write(data: ByteArray) {
             if (closed) return
-            queued.addAndGet(data.size)
-            queue.offer(data)
+            queue.offer(Queued(data))
         }
 
-        override fun backlogBytes(): Int = queued.get()
+        override fun backlogAgeMs() = queue.peek()?.ageMs() ?: 0L
 
-        override fun clearBacklog() {
-            queue.clear()
-            queued.set(0)
-        }
+        override fun clearBacklog() = queue.clear()
 
         fun close() {
             if (closed) return

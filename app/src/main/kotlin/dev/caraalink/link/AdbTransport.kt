@@ -32,11 +32,10 @@ class AdbTransport(
     }
 
     inner class Stream(override val localId: Int, val remoteId: Int, val service: String, val handler: StreamHandler) : MirrorStream {
-        private val queue = ArrayDeque<ByteArray>()
+        private val queue = ArrayDeque<Queued>()
         private var canSend = true
         @Volatile override var closed = false
             private set
-        private var queuedBytes = 0
 
         /** Queues [data] (split to maxdata chunks); sent one WRTE per remote OKAY. */
         override fun write(data: ByteArray) {
@@ -45,20 +44,16 @@ class AdbTransport(
                 var off = 0
                 while (off < data.size) {
                     val n = minOf(maxData, data.size - off)
-                    queue.add(data.copyOfRange(off, off + n))
-                    queuedBytes += n
+                    queue.add(Queued(data.copyOfRange(off, off + n)))
                     off += n
                 }
             }
             pump()
         }
 
-        override fun backlogBytes(): Int = synchronized(this) { queuedBytes }
+        override fun backlogAgeMs(): Long = synchronized(this) { queue.peek()?.ageMs() ?: 0L }
 
-        override fun clearBacklog() = synchronized(this) {
-            queue.clear()
-            queuedBytes = 0
-        }
+        override fun clearBacklog() = synchronized(this) { queue.clear() }
 
         internal fun onRemoteOkay() {
             synchronized(this) { canSend = true }
@@ -69,9 +64,8 @@ class AdbTransport(
             val chunk = synchronized(this) {
                 if (!canSend || closed) return
                 val c = queue.poll() ?: return
-                queuedBytes -= c.size
                 canSend = false
-                c
+                c.bytes
             }
             sendPacket(CMD_WRTE, localId, remoteId, chunk)
         }

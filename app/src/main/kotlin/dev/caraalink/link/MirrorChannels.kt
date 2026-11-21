@@ -57,8 +57,15 @@ interface MirrorStream {
     val localId: Int
     val closed: Boolean
     fun write(data: ByteArray)
-    fun backlogBytes(): Int
+    /** How long the oldest queued write has waited; 0 when nothing is queued. */
+    fun backlogAgeMs(): Long
     fun clearBacklog()
+}
+
+/** A write waiting in a transport queue, stamped so [MirrorStream.backlogAgeMs] can tell how stale the link is. */
+class Queued(val bytes: ByteArray, val video: Boolean = true) {
+    private val at = System.nanoTime()
+    fun ageMs() = (System.nanoTime() - at) / 1_000_000
 }
 
 /** Callbacks from the mirror channels into [CarSession]. */
