@@ -166,7 +166,11 @@ fun DashLink(text: String, onClick: () -> Unit) {
 /** The author's name, under the wordmark and at the foot of Settings. */
 @Composable
 fun Byline(modifier: Modifier = Modifier) {
-    Text(stringResource(R.string.made_by), modifier, color = Dash.Muted, fontSize = 11.sp)
+    // The build in every screenshot a user sends.
+    Text(
+        "${stringResource(R.string.made_by)} · v${dev.caraalink.BuildConfig.VERSION_NAME} (${dev.caraalink.BuildConfig.GIT_SHA})",
+        modifier, color = Dash.Muted, fontSize = 11.sp,
+    )
 }
 
 /** "AA BRIDGE" wordmark with the settings gear. */
