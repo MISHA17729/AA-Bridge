@@ -30,6 +30,7 @@ import dev.caraalink.connection.CarLink
 import dev.caraalink.connection.WirelessPhase
 import dev.caraalink.diagnostics.AdbHandshakeProbe
 import dev.caraalink.diagnostics.DiagnosticLogger
+import dev.caraalink.link.QdTransport
 import dev.caraalink.link.SocketTransport
 import dev.caraalink.wireless.CarHello
 import dev.caraalink.wireless.CarMatch
@@ -233,8 +234,8 @@ class UsbLinkForegroundService : Service() {
         }
         session = s
         if (!s.start()) {
-            session = null
             ConnectionStateHolder.update { it.copy(phase = ConnectionPhase.ERROR, lastError = "openAccessory() returned null") }
+            session = null
             // openAccessory() can fail this way for a beat right after a
             // physical USB-C reconnect (uevent port0-partner "add" lands a
             // few hundred ms before the accessory is actually openable) --
@@ -283,6 +284,8 @@ class UsbLinkForegroundService : Service() {
         lastPhase = snapshot.phase
         // Wireless runs its own reconnect window; see onWirelessSessionEnded.
         if (!shouldStopOnError(previous, snapshot)) return
+        // A cable session's end callback reopens or stops; stopping here left its reopen running unprotected.
+        if (session != null) return
         stopSelfCleanly()
     }
 
@@ -501,17 +504,21 @@ class UsbLinkForegroundService : Service() {
 
     /** Transport-level read/write failure, as opposed to a clean close or a real unplug. */
     private fun isTransportIoFailure(reason: String): Boolean =
-        reason.contains("read failed", ignoreCase = true) || reason.contains("write failed", ignoreCase = true)
+        reason.contains("read failed", ignoreCase = true) || reason.contains("write failed", ignoreCase = true) ||
+            reason.startsWith("watchdog")
 
     private fun scheduleTransportReconnect() {
         val accessory = pendingAccessory ?: return
-        if (transportReconnectAttempts >= MAX_TRANSPORT_RECONNECT_ATTEMPTS) {
+        val qd = accessory.manufacturer == QdTransport.MANUFACTURER
+        // QDLink keeps trying while plugged in; an unplug still stops the service through detachReceiver.
+        if (!qd && transportReconnectAttempts >= MAX_TRANSPORT_RECONNECT_ATTEMPTS) {
             Log.w(TAG, "scheduleTransportReconnect: giving up after $transportReconnectAttempts attempts")
             stopSelfCleanly()
             return
         }
         transportReconnectAttempts++
-        val delayMs = TRANSPORT_RECONNECT_BASE_DELAY_MS * (1L shl (transportReconnectAttempts - 1))
+        val delayMs = if (qd) QD_RECONNECT_DELAYS_MS[minOf(transportReconnectAttempts, QD_RECONNECT_DELAYS_MS.size) - 1]
+            else TRANSPORT_RECONNECT_BASE_DELAY_MS * (1L shl (transportReconnectAttempts - 1))
         Log.i(TAG, "scheduleTransportReconnect: attempt $transportReconnectAttempts in ${delayMs}ms")
         val runnable = Runnable {
             transportReconnectRunnable = null
@@ -627,6 +634,8 @@ class UsbLinkForegroundService : Service() {
         private const val NOTIFICATION_ID = 1
         private const val MAX_TRANSPORT_RECONNECT_ATTEMPTS = 4
         private const val TRANSPORT_RECONNECT_BASE_DELAY_MS = 2_000L
+        /** QDLink ignores a cable session within 6 s of the last one (Shams-eldin's Emgrand Auto, from QDLink's code). */
+        private val QD_RECONNECT_DELAYS_MS = longArrayOf(6_000, 6_000, 10_000, 30_000, 60_000)
         private const val OPEN_TO_RECONNECT_ID = 4
         private const val SEARCH_TIMEOUT_MS = 30_000L
         private const val CONNECT_TIMEOUT_MS = 30_000L
