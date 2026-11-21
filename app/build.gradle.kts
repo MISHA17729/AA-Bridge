@@ -23,8 +23,8 @@ android {
         applicationId = "io.github.alimorgaan.aabridge"
         minSdk = 29
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.2.0"
+        versionCode = 6
+        versionName = "1.2.1"
         buildConfigField("String", "GIT_SHA", "\"${gitSha()}\"")
     }
 
