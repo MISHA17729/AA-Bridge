@@ -43,9 +43,8 @@ class CarVideoEncoder(
             val level = if (maxOf(width, height) >= 1920) MediaCodecInfo.CodecProfileLevel.AVCLevel4 else MediaCodecInfo.CodecProfileLevel.AVCLevel31
             setInteger(MediaFormat.KEY_LEVEL, level)
             setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
-            // Realtime priority as scrcpy sets it. No KEY_OPERATING_RATE: 1.2.0's Short.MAX_VALUE is the suspect
-            // for a vivo V2318 encoder that never output, and Media3 lists SoCs where a huge rate breaks encoders.
-            setInteger(MediaFormat.KEY_PRIORITY, 0)
+            // No KEY_PRIORITY / KEY_OPERATING_RATE / QTI low-latency: 1.2.0 added them and two users' encoders
+            // then never output a frame, so the car hung on initializing. 1.1.1 ran without them.
         }
         val callback = object : MediaCodec.Callback() {
             override fun onInputBufferAvailable(codec: MediaCodec, index: Int) {}
@@ -83,8 +82,7 @@ class CarVideoEncoder(
         } catch (e: Exception) {
             // Some encoders reject the baseline/level/low-latency hints; retry plain.
             log("encoder configure with hints failed, retrying plain: $e")
-            listOf(MediaFormat.KEY_PROFILE, MediaFormat.KEY_LEVEL, MediaFormat.KEY_LOW_LATENCY,
-                MediaFormat.KEY_PRIORITY).forEach { format.removeKey(it) }
+            listOf(MediaFormat.KEY_PROFILE, MediaFormat.KEY_LEVEL, MediaFormat.KEY_LOW_LATENCY).forEach { format.removeKey(it) }
             codec.reset()
             codec.setCallback(callback, handler)
             codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
