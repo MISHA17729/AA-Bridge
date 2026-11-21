@@ -1,5 +1,6 @@
 package dev.caraalink.link
 
+import android.os.Process
 import dev.caraalink.diagnostics.DiagnosticLogger
 import java.io.IOException
 import java.net.InetSocketAddress
@@ -76,7 +77,10 @@ class SocketTransport(
             }
             val stream = SocketStream(nextId.getAndIncrement(), socket)
             streams += stream
-            thread(name = "SocketTransport-read-$port", isDaemon = true) { readLoop(stream, handler, port) }
+            thread(name = "SocketTransport-read-$port", isDaemon = true) {
+                Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_DISPLAY)
+                readLoop(stream, handler, port)
+            }
         }
     }
 
@@ -109,6 +113,7 @@ class SocketTransport(
             private set
 
         private val writer = thread(name = "SocketTransport-write-$localId", isDaemon = true) {
+            Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_DISPLAY)
             try {
                 val out = socket.getOutputStream()
                 while (!closed) {

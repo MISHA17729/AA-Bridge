@@ -1,6 +1,7 @@
 package dev.caraalink.aa
 
 import android.content.Context
+import android.os.Process
 import android.util.Log
 import dev.caraalink.diagnostics.DiagnosticLogger
 import java.io.DataInputStream
@@ -196,7 +197,7 @@ class AaSessionProbe(
     // throw NetworkOnMainThreadException on the UI thread. One background
     // thread serializes all touch sends; AaTlsChannel's send/wrap/unwrap are
     // themselves @Synchronized so this doesn't race the worker thread's reads.
-    private val touchExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "AaSessionProbe-touch").apply { isDaemon = true } }
+    private val touchExecutor = Executors.newSingleThreadExecutor { r -> urgentThread(r, "AaSessionProbe-touch") }
 
     // Video/audio decode used to run inline on this probe's single message-
     // receive thread (the same thread doing TLS unwrap and replying to every
@@ -207,7 +208,7 @@ class AaSessionProbe(
     // behind real-time, so the screen's response to a touch lags along with
     // the video itself. A dedicated thread keeps the protocol loop free to
     // keep up with pings/control traffic regardless of how decode is doing.
-    private val mediaExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "AaSessionProbe-media").apply { isDaemon = true } }
+    private val mediaExecutor = Executors.newSingleThreadExecutor { r -> urgentThread(r, "AaSessionProbe-media") }
 
     // Confirmed live: video "struggling" (heavy frames, thermal throttling)
     // and choppy audio were reported happening at the same time -- audio
@@ -278,7 +279,7 @@ class AaSessionProbe(
         // in the trillions of ms. Seeding this at start() closes that gap;
         // the later resets (post-handshake, per real frame) still apply.
         lastVideoFrameAt = System.currentTimeMillis()
-        worker = Thread({ run() }, "AaSessionProbe").apply { isDaemon = true }
+        worker = urgentThread({ run() }, "AaSessionProbe")
         active = this
         worker!!.start()
     }
@@ -992,3 +993,9 @@ class AaSessionProbe(
         if (f.payload.isNotEmpty()) logger.logBytes("RX", f.payload, minOf(f.payload.size, 256))
     }
 }
+
+/** Daemon thread at display priority, for the video and touch path. */
+private fun urgentThread(r: Runnable, name: String) = Thread({
+    Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_DISPLAY)
+    r.run()
+}, name).apply { isDaemon = true }

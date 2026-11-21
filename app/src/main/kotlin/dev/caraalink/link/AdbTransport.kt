@@ -1,5 +1,6 @@
 package dev.caraalink.link
 
+import android.os.Process
 import android.util.Log
 import dev.caraalink.diagnostics.DiagnosticLogger
 import dev.caraalink.usb.UsbAccessoryConnection
@@ -96,6 +97,7 @@ class AdbTransport(
     fun start() {
         if (!running.compareAndSet(false, true)) return
         readThread = Thread({
+            Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_DISPLAY)
             // One reversible experiment, not a confirmed fix (chatgpt-status.md
             // "External repo review for the EIO lead"): BLECarbitlink's own
             // protocol notes cite the *exact* EIO signature we keep hitting --

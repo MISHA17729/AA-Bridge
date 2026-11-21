@@ -6,6 +6,7 @@ import android.media.MediaFormat
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.Process
 import android.util.Log
 import android.view.Surface
 
@@ -21,7 +22,7 @@ class CarVideoEncoder(
     private val bitRate: Int,
     private val onFrame: (data: ByteArray, isConfig: Boolean, isKey: Boolean) -> Unit,
 ) {
-    private val thread = HandlerThread("CarVideoEncoder").also { it.start() }
+    private val thread = HandlerThread("CarVideoEncoder", Process.THREAD_PRIORITY_URGENT_DISPLAY).also { it.start() }
     private val codec: MediaCodec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
     lateinit var inputSurface: Surface
         private set
@@ -41,6 +42,10 @@ class CarVideoEncoder(
             val level = if (maxOf(width, height) >= 1920) MediaCodecInfo.CodecProfileLevel.AVCLevel4 else MediaCodecInfo.CodecProfileLevel.AVCLevel31
             setInteger(MediaFormat.KEY_LEVEL, level)
             setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
+            // Realtime priority at full clock speed: shorter encodes for a little more heat.
+            setInteger(MediaFormat.KEY_PRIORITY, 0)
+            setInteger(MediaFormat.KEY_OPERATING_RATE, Short.MAX_VALUE.toInt())
+            setInteger(QTI_LOW_LATENCY, 1)
         }
         val callback = object : MediaCodec.Callback() {
             override fun onInputBufferAvailable(codec: MediaCodec, index: Int) {}
@@ -78,7 +83,8 @@ class CarVideoEncoder(
         } catch (e: Exception) {
             // Some encoders reject the baseline/level/low-latency hints; retry plain.
             Log.w(TAG, "configure with hints failed, retrying plain", e)
-            listOf(MediaFormat.KEY_PROFILE, MediaFormat.KEY_LEVEL, MediaFormat.KEY_LOW_LATENCY).forEach { format.removeKey(it) }
+            listOf(MediaFormat.KEY_PROFILE, MediaFormat.KEY_LEVEL, MediaFormat.KEY_LOW_LATENCY,
+                MediaFormat.KEY_PRIORITY, MediaFormat.KEY_OPERATING_RATE, QTI_LOW_LATENCY).forEach { format.removeKey(it) }
             codec.reset()
             codec.setCallback(callback, handler)
             codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
@@ -103,5 +109,7 @@ class CarVideoEncoder(
 
     companion object {
         private const val TAG = "CarVideoEncoder"
+        /** Snapdragon encoders' own low-latency switch; other encoders ignore it. */
+        private const val QTI_LOW_LATENCY = "vendor.qti-ext-enc-low-latency.enable"
     }
 }

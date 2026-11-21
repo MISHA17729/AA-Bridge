@@ -6,6 +6,7 @@ import android.media.MediaFormat
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.Process
 import android.util.Log
 import android.view.Surface
 import java.util.concurrent.LinkedBlockingQueue
@@ -38,7 +39,7 @@ class AaVideoDecoder(private val width: Int, private val height: Int) {
             format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
         }
         val inputs = LinkedBlockingQueue<Int>()
-        val t = HandlerThread("AaVideoDecoder").also { it.start() }
+        val t = HandlerThread("AaVideoDecoder", Process.THREAD_PRIORITY_URGENT_DISPLAY).also { it.start() }
         // Async mode shows each frame as soon as it's decoded, instead of when the next frame is fed in.
         c.setCallback(object : MediaCodec.Callback() {
             override fun onInputBufferAvailable(codec: MediaCodec, index: Int) {

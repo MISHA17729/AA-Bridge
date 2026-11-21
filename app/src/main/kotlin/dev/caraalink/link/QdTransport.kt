@@ -2,6 +2,7 @@ package dev.caraalink.link
 
 import android.content.res.Resources
 import android.os.Build
+import android.os.Process
 import android.view.MotionEvent
 import dev.caraalink.diagnostics.DiagnosticLogger
 import dev.caraalink.usb.UsbAccessoryConnection
@@ -141,10 +142,16 @@ class QdTransport(
         val a = conn.accessory
         logger.log("QD accessory: manufacturer=${a.manufacturer} model=${a.model} version=${a.version} " +
             "description=${a.description} uri=${a.uri} serial=${runCatching { a.serial }.getOrNull()}")
-        writer = thread(name = "QDLink-writer", isDaemon = true) { writeLoop() }
+        writer = thread(name = "QDLink-writer", isDaemon = true) {
+            Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_DISPLAY)
+            writeLoop()
+        }
         logger.log("QD TX: AppStatus (!BIN)")
         send(QdFrames.appStatus(Build.VERSION.SDK_INT))
-        thread(name = "QDLink-reader", isDaemon = true) { readLoop() }
+        thread(name = "QDLink-reader", isDaemon = true) {
+            Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_DISPLAY)
+            readLoop()
+        }
         timer = thread(name = "QDLink-timer", isDaemon = true) { timerLoop() }
     }
 
