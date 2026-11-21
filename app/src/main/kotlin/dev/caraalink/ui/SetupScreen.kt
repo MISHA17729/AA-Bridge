@@ -150,6 +150,7 @@ fun SetupScreen(onDone: () -> Unit, onOpenNearby: () -> Unit) {
                 StepCard(4, step, R.string.setup_car_title, R.string.setup_car_body) {
                     TextButton(onClick = onOpenNearby) { Text(stringResource(R.string.home_connect_wireless)) }
                 }
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { SendLogsLink() }
                 Spacer(Modifier.height(24.dp))
             }
         }

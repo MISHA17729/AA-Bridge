@@ -251,7 +251,7 @@ private fun HomeActions(state: HomeState, connection: ConnectionSnapshot, onOpen
 
 /** Zips the logs and opens the share sheet, so a tester far away can send them over any chat app. */
 @Composable
-private fun SendLogsLink() {
+fun SendLogsLink() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     Spacer(Modifier.height(4.dp))
