@@ -122,8 +122,13 @@ class QdTransport(
     private val closed = AtomicBoolean()
     private var writer: Thread? = null
     private var timer: Thread? = null
-    @Volatile private var lastReadAt = System.currentTimeMillis()
+    private val startedAt = System.currentTimeMillis()
+    @Volatile private var lastReadAt = startedAt
     @Volatile private var reads = 0
+    @Volatile private var writeSince = 0L
+    @Volatile private var carInfo = false
+    private var appStatusResends = 0
+    private var appStatusAt = startedAt
     @Volatile private var whitelist = false
     private var whitelistWanted = false
     private var carW = 800
@@ -182,7 +187,9 @@ class QdTransport(
         try {
             while (!closed.get()) {
                 val f = queue.take()
+                writeSince = System.currentTimeMillis()
                 conn.output.write(f.bytes)
+                writeSince = 0L
                 backlog.addAndGet(-f.bytes.size)
             }
         } catch (_: InterruptedException) {
@@ -230,6 +237,10 @@ class QdTransport(
                     logger.log("QD: the car is sending again")
                 }
                 if (tick % 10 == 0) logger.log("QD stats: reads=$reads videoFrames=$framesSent videoBytes=$videoBytes backlog=${backlog.get()}")
+                watchdog(System.currentTimeMillis(), startedAt, lastReadAt, reads > 0, carInfo, writeSince)?.let {
+                    stop(it)
+                    return
+                }
             }
         } catch (_: InterruptedException) {
         }
@@ -252,7 +263,9 @@ class QdTransport(
     private fun onCommand(msg: JSONObject) {
         val para = msg.optJSONObject("PARA") ?: JSONObject()
         when (msg.optString("CMD")) {
+            "HEARTBEAT" -> if (!carInfo) resendAppStatus()
             "CAR_INFO" -> {
+                carInfo = true
                 val w = para.optInt("CarWidth")
                 val h = para.optInt("CarHeight")
                 if (w > 0 || h > 0) {
@@ -284,6 +297,16 @@ class QdTransport(
             "LAND_MODE_REQ" -> sendCmd("LAND_MODE_RSP", JSONObject().put("Orientation", para.optInt("Orientation"))
                 .put("Authority", 1).put("StatusArg", 0))
         }
+    }
+
+    /** The car is alive but missed our AppStatus: send it again, a few times at most. */
+    private fun resendAppStatus() {
+        val now = System.currentTimeMillis()
+        if (appStatusResends >= APP_STATUS_RESENDS || now - appStatusAt < APP_STATUS_GAP_MS) return
+        appStatusResends++
+        appStatusAt = now
+        logger.log("QD TX: AppStatus again ($appStatusResends/$APP_STATUS_RESENDS), the car sends heartbeats but no CAR_INFO")
+        send(QdFrames.appStatus(Build.VERSION.SDK_INT))
     }
 
     private fun configure() {
@@ -374,6 +397,28 @@ class QdTransport(
         private const val TOUCHES_LOGGED = 200
         private const val SILENCE_MS = 5_000L
         private const val WHITELIST_ON = """{"AppID":"Mirror","FunctionID":"WhitelistAppOn","Para":{"WhitelistAppOn":1}}"""
+
+        private const val APP_STATUS_RESENDS = 3
+        private const val APP_STATUS_GAP_MS = 2_500L
+        // Timings from Shams-eldin's Emgrand Auto, tuned on QDLink cars.
+        private const val SILENT_CLOSE_MS = 15_000L
+        private const val STUCK_CLOSE_MS = 10_000L
+        private const val STUCK_TALKING_CLOSE_MS = 20_000L
+        private const val CAR_TALKING_MS = 5_000L
+        private const val HANDSHAKE_MS = 12_000L
+
+        /** Why to end a session the car stopped serving, so the service can reopen it; null while it's healthy. */
+        internal fun watchdog(now: Long, startedAt: Long, lastReadAt: Long, carSpoke: Boolean, carInfo: Boolean, writeSince: Long): String? {
+            val silent = now - lastReadAt
+            val stuck = if (writeSince == 0L) 0L else now - writeSince
+            return when {
+                carSpoke && silent >= SILENT_CLOSE_MS -> "watchdog: no bytes from the car for ${silent / 1000}s"
+                stuck >= STUCK_CLOSE_MS && (silent >= CAR_TALKING_MS || stuck >= STUCK_TALKING_CLOSE_MS) ->
+                    "watchdog: a write has been stuck for ${stuck / 1000}s"
+                !carInfo && now - startedAt >= HANDSHAKE_MS -> "watchdog: no CAR_INFO after ${HANDSHAKE_MS / 1000}s"
+                else -> null
+            }
+        }
 
         private fun even(v: Int) = if (v % 2 != 0) v + 1 else v
     }

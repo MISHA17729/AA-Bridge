@@ -2,6 +2,8 @@ package dev.caraalink.link
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class QdFramesTest {
@@ -35,5 +37,21 @@ class QdFramesTest {
         reader.feed(hex("01 02") + unpadded + unpadded, 4 + 2 * unpadded.size)
         assertEquals(listOf(1 to 700, 0 to 18, 0 to 18), got)
         assertEquals(listOf(2), junk)
+    }
+
+    @Test
+    fun watchdogEndsOnlySessionsTheCarStoppedServing() {
+        fun w(now: Long, lastRead: Long = now, spoke: Boolean = true, info: Boolean = true, writeSince: Long = 0) =
+            QdTransport.watchdog(now, startedAt = 0, lastReadAt = lastRead, carSpoke = spoke, carInfo = info, writeSince = writeSince)
+        assertNull(w(60_000, lastRead = 46_000))
+        assertNotNull(w(60_000, lastRead = 45_000))
+        // A car that never spoke is left to the handshake timeout.
+        assertNull(w(60_000, lastRead = 0, spoke = false))
+        // A stuck write survives while the car still talks, up to 20 s.
+        assertNull(w(60_000, writeSince = 49_000))
+        assertNotNull(w(60_000, writeSince = 49_000, lastRead = 54_000))
+        assertNotNull(w(60_000, writeSince = 39_000))
+        assertNull(w(11_000, info = false))
+        assertNotNull(w(12_000, info = false))
     }
 }
