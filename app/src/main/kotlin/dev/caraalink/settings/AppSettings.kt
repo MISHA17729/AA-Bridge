@@ -66,7 +66,7 @@ object AppSettings {
         }
 
     fun frameRate(context: Context): Int =
-        prefs(context).getString("video_frame_rate", "60")?.toIntOrNull() ?: 60
+        prefs(context).getString("video_frame_rate", "30")?.toIntOrNull() ?: 30
 
     fun videoBitrateKbps(context: Context): Int =
         prefs(context).getString("video_bitrate_kbps", "6000")?.toIntOrNull() ?: 6000
@@ -140,7 +140,15 @@ object AppSettings {
      * Custom resolution still wins outright when it's set.
      */
     fun videoDownscale720p(context: Context): Boolean =
-        prefs(context).getBoolean("video_downscale_720p", false)
+        prefs(context).getBoolean("video_downscale_720p", true)
+
+    /** Moves every install once onto 720p at 30 fps, which tested much faster than 1080p at 60. */
+    fun applyFastVideoDefaults(context: Context) {
+        val p = prefs(context)
+        if (p.getBoolean("fast_video_defaults", false)) return
+        p.edit().putBoolean("video_downscale_720p", true).putString("video_frame_rate", "30")
+            .putBoolean("fast_video_defaults", true).apply()
+    }
 
     /**
      * AA only offers 9 fixed resolutions (see AaServiceDiscovery), none of
