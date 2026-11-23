@@ -9,7 +9,7 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,14 +17,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,13 +40,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -99,15 +99,22 @@ private fun rememberConnection(): ConnectionSnapshot {
 /** The wordmark on screens without the settings gear. */
 @Composable
 fun BrandBar(modifier: Modifier = Modifier) {
-    Column(modifier.padding(horizontal = 24.dp, vertical = 18.dp)) {
-        Text(
-            stringResource(R.string.app_name).uppercase(),
-            color = Dash.Teal,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.ExtraBold,
-            letterSpacing = 1.5.sp,
-        )
-        Byline()
+    Column(modifier.fillMaxWidth()) {
+        Row(
+            Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GeelyEmblemMark()
+            Spacer(Modifier.width(12.dp))
+            Text(
+                stringResource(R.string.app_name),
+                color = Dash.Text,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = (-0.2).sp,
+            )
+        }
+        HorizontalDivider(thickness = 1.dp, color = Dash.TileBorder)
     }
 }
 
@@ -144,7 +151,6 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
     val state = homeState(serverRunning, carConnected, connection.wireless)
     val searchName = carToRetry(connection, AppSettings.wirelessCar(context))?.name
     val carName = connection.carName ?: searchName ?: stringResource(R.string.state_connected)
-    val alert = state == HomeState.NEEDS_TAP || state == HomeState.NOT_FOUND || state == HomeState.WIFI_OFF
 
     var idleRemainingMin by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(serverRunning, carConnected) {
@@ -168,33 +174,44 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
     Column(
         Modifier
             .fillMaxSize()
-            .dashGlow(
-                when {
-                    alert -> Dash.GlowAmber
-                    state == HomeState.READY -> Dash.GlowIdle
-                    else -> Dash.GlowTeal
-                },
-            )
+            .background(Dash.Background)
             .systemBarsPadding(),
     ) {
         DashTopBar(onOpenSettings)
+
         Column(
-            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
         ) {
-            Spacer(Modifier.height(20.dp))
-            val car = painterResource(R.drawable.ic_car)
-            val warning = rememberVectorPainter(Icons.Rounded.Warning)
-            when (state) {
-                HomeState.READY -> StatusRing(RingMode.IDLE, car, stringResource(R.string.ring_ready))
-                HomeState.SEARCHING -> StatusRing(RingMode.SPIN, car, stringResource(R.string.ring_searching))
-                HomeState.CONNECTING -> StatusRing(RingMode.SPIN, car, stringResource(R.string.ring_connecting))
-                HomeState.CONNECTED -> StatusRing(RingMode.FULL, car, stringResource(R.string.ring_connected))
-                HomeState.NEEDS_TAP -> StatusRing(RingMode.ALERT, painterResource(R.drawable.ic_touch_app), stringResource(R.string.ring_needs_tap))
-                HomeState.NOT_FOUND -> StatusRing(RingMode.ALERT, warning, stringResource(R.string.ring_not_found))
-                HomeState.WIFI_OFF -> StatusRing(RingMode.ALERT, warning, stringResource(R.string.ring_wifi_off))
+            Spacer(Modifier.height(28.dp))
+
+            // Subtle status badge: dot + plain sentence-case state
+            val statusDot = when (state) {
+                HomeState.CONNECTED -> Dash.Success
+                HomeState.SEARCHING, HomeState.CONNECTING -> Dash.Teal
+                HomeState.NEEDS_TAP, HomeState.NOT_FOUND, HomeState.WIFI_OFF -> Dash.Amber
+                HomeState.READY -> Dash.Success
             }
-            Spacer(Modifier.height(22.dp))
+            val statusLabel = when (state) {
+                HomeState.READY -> stringResource(R.string.ring_ready)
+                HomeState.SEARCHING -> stringResource(R.string.ring_searching)
+                HomeState.CONNECTING -> stringResource(R.string.ring_connecting)
+                HomeState.CONNECTED -> stringResource(R.string.ring_connected)
+                HomeState.NEEDS_TAP -> stringResource(R.string.ring_needs_tap)
+                HomeState.NOT_FOUND -> stringResource(R.string.ring_not_found)
+                HomeState.WIFI_OFF -> stringResource(R.string.ring_wifi_off)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(statusDot))
+                Spacer(Modifier.width(8.dp))
+                Text(statusLabel, color = Dash.Muted, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
+
+            Spacer(Modifier.height(10.dp))
+
             val title = when (state) {
                 HomeState.READY -> stringResource(R.string.home_ready_title)
                 HomeState.NEEDS_TAP -> stringResource(R.string.home_needs_tap_title)
@@ -216,51 +233,92 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                 HomeState.NOT_FOUND -> R.string.home_not_found_body
                 HomeState.WIFI_OFF -> R.string.home_wifi_off_body
             }
-            Text(title, style = MaterialTheme.typography.headlineMedium, color = Dash.Text, textAlign = TextAlign.Center)
+            Text(title, style = MaterialTheme.typography.headlineMedium, color = Dash.Text)
             Spacer(Modifier.height(6.dp))
-            Text(stringResource(body), style = MaterialTheme.typography.bodyLarge, color = Dash.Muted, textAlign = TextAlign.Center)
-            if (serverRunning && !carConnected) {
-                idleRemainingMin?.let { mins ->
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        stringResource(R.string.home_server_auto_stop, mins),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Dash.Muted,
-                        textAlign = TextAlign.Center,
-                    )
+            Text(stringResource(body), style = MaterialTheme.typography.bodyLarge, color = Dash.Muted)
+
+            if (state == HomeState.SEARCHING || state == HomeState.CONNECTING) {
+                Spacer(Modifier.height(16.dp))
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(1.dp)),
+                    color = Dash.Teal,
+                    trackColor = Dash.Track,
+                )
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            // Unified 3-row Geely instrument status card with crisp hairline dividers
+            val cable = carConnected && connection.link == CarLink.CABLE
+            val linkValue = when {
+                !carConnected -> stringResource(R.string.state_not_connected)
+                cable -> stringResource(R.string.link_cable_short)
+                else -> stringResource(R.string.link_wireless_short)
+            }
+            val linkLamp = when {
+                carConnected -> Lamp.ON
+                state == HomeState.WIFI_OFF -> Lamp.ALERT
+                else -> Lamp.OFF
+            }
+            val panelShape = RoundedCornerShape(14.dp)
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(panelShape)
+                    .background(Dash.Tile)
+                    .border(1.dp, Dash.TileBorder, panelShape),
+            ) {
+                InstrumentRow(
+                    label = stringResource(R.string.row_server),
+                    value = stringResource(if (serverRunning) R.string.state_running else R.string.state_off),
+                    lamp = if (serverRunning) Lamp.ON else Lamp.ALERT,
+                )
+                HorizontalDivider(thickness = 1.dp, color = Dash.TileBorder)
+                InstrumentRow(
+                    label = stringResource(R.string.tile_link),
+                    value = linkValue,
+                    lamp = linkLamp,
+                )
+                HorizontalDivider(thickness = 1.dp, color = Dash.TileBorder)
+                InstrumentRow(
+                    label = stringResource(R.string.row_car),
+                    value = if (carConnected) carName else stringResource(R.string.state_not_connected),
+                    lamp = if (carConnected) Lamp.ON else Lamp.OFF,
+                )
+                if (serverRunning && !carConnected) {
+                    idleRemainingMin?.let { mins ->
+                        HorizontalDivider(thickness = 1.dp, color = Dash.TileBorder)
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                stringResource(R.string.home_server_auto_stop, mins),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Dash.Muted,
+                            )
+                        }
+                    }
                 }
             }
-            if (state == HomeState.NEEDS_TAP) {
-                Spacer(Modifier.height(20.dp))
-                MenuHint(stringResource(R.string.menu_start_server))
-            }
+
             if (state == HomeState.NOT_FOUND) {
-                connection.suggestion?.let { found -> Spacer(Modifier.height(18.dp)); SuggestionTile(found.name) { startWireless(context, found.address, found.name) } }
+                connection.suggestion?.let { found ->
+                    Spacer(Modifier.height(14.dp))
+                    SuggestionTile(found.name) { startWireless(context, found.address, found.name) }
+                }
             }
+
             Spacer(Modifier.height(24.dp))
         }
-        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(36.dp, Alignment.CenterHorizontally)) {
-                Telltale(painterResource(R.drawable.ic_server), stringResource(R.string.tile_server), if (serverRunning) Lamp.ON else Lamp.ALERT)
-                val cable = carConnected && connection.link == CarLink.CABLE
-                Telltale(
-                    painterResource(if (cable) R.drawable.ic_usb else R.drawable.ic_wifi),
-                    stringResource(
-                        when {
-                            !carConnected -> R.string.tile_link
-                            cable -> R.string.link_cable_short
-                            else -> R.string.link_wireless_short
-                        },
-                    ),
-                    when {
-                        carConnected -> Lamp.ON
-                        state == HomeState.WIFI_OFF -> Lamp.ALERT
-                        else -> Lamp.OFF
-                    },
-                )
-                Telltale(painterResource(R.drawable.ic_car), stringResource(R.string.tile_car), if (carConnected) Lamp.ON else Lamp.OFF)
-            }
-            Spacer(Modifier.height(16.dp))
+
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             HomeActions(state, serverRunning, carConnected, connection, onOpenNearby)
             SendLogsLink()
         }
@@ -280,26 +338,33 @@ private fun HomeActions(
     when (state) {
         HomeState.READY -> {
             GlowButton(stringResource(R.string.home_connect_wireless), onOpenNearby)
-            Spacer(Modifier.height(4.dp))
-            DashLink(stringResource(R.string.home_stop_server)) {
+            Spacer(Modifier.height(10.dp))
+            SecondaryButton(stringResource(R.string.home_stop_server), {
                 toggleHeadUnitServer(context, AaServerAccessibilityService.Action.STOP)
+            })
+        }
+        HomeState.SEARCHING, HomeState.CONNECTING -> {
+            SecondaryButton(stringResource(R.string.home_use_another_car), onOpenNearby)
+        }
+        HomeState.CONNECTED -> {
+            if (connection.link == CarLink.WIRELESS) {
+                SecondaryButton(stringResource(R.string.home_disconnect), { stopLink(context) })
             }
         }
-        HomeState.SEARCHING, HomeState.CONNECTING -> DashLink(stringResource(R.string.home_use_another_car), onOpenNearby)
-        HomeState.CONNECTED -> if (connection.link == CarLink.WIRELESS) DashLink(stringResource(R.string.home_disconnect)) { stopLink(context) }
         HomeState.NEEDS_TAP -> {
             AmberButton(
                 stringResource(R.string.home_start_server),
                 { toggleHeadUnitServer(context, AaServerAccessibilityService.Action.START) },
             )
-            Spacer(Modifier.height(4.dp))
-            DashLink(stringResource(R.string.open_aa_manual)) { AndroidAutoServer.openSettings(context) }
+            Spacer(Modifier.height(10.dp))
+            SecondaryButton(stringResource(R.string.open_aa_manual), { AndroidAutoServer.openSettings(context) })
         }
         HomeState.NOT_FOUND -> {
             GlowButton(stringResource(R.string.home_try_again), { retryWireless(context, connection) })
-            Spacer(Modifier.height(4.dp))
-            DashLink(stringResource(R.string.home_choose_car), onOpenNearby)
+            Spacer(Modifier.height(10.dp))
+            SecondaryButton(stringResource(R.string.home_choose_car), onOpenNearby)
             if (serverRunning && !carConnected) {
+                Spacer(Modifier.height(6.dp))
                 DashLink(stringResource(R.string.home_stop_server)) {
                     toggleHeadUnitServer(context, AaServerAccessibilityService.Action.STOP)
                 }
@@ -307,9 +372,10 @@ private fun HomeActions(
         }
         HomeState.WIFI_OFF -> {
             AmberButton(stringResource(R.string.home_wifi_settings), { context.startActivity(Intent(Settings.Panel.ACTION_WIFI)) })
-            Spacer(Modifier.height(4.dp))
-            DashLink(stringResource(R.string.home_try_again)) { retryWireless(context, connection) }
+            Spacer(Modifier.height(10.dp))
+            SecondaryButton(stringResource(R.string.home_try_again), { retryWireless(context, connection) })
             if (serverRunning && !carConnected) {
+                Spacer(Modifier.height(6.dp))
                 DashLink(stringResource(R.string.home_stop_server)) {
                     toggleHeadUnitServer(context, AaServerAccessibilityService.Action.STOP)
                 }
@@ -336,12 +402,13 @@ fun SendLogsLink() {
 /** A device with the remembered car's name, one tap away. */
 @Composable
 private fun SuggestionTile(name: String, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(shape)
             .background(Dash.Tile)
-            .border(1.dp, Dash.Teal.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+            .border(1.dp, Dash.Teal, shape)
             .clickable(onClick = onClick)
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
