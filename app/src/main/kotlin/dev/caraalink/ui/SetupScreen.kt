@@ -184,7 +184,7 @@ private fun StepCard(number: Int, current: Int, title: Int, body: Int, action: (
                     Text(
                         number.toString(),
                         style = MaterialTheme.typography.labelLarge,
-                        color = if (active) Color.White else Dash.Muted,
+                        color = if (active) Color(0xFF0E1014) else Dash.Muted,
                     )
                 }
             }

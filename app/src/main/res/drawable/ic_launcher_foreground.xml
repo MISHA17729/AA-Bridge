@@ -4,17 +4,29 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- The bridge mark from docs/logo.svg, centred in the adaptive-icon safe zone. -->
+    <!-- Exact 3.4:1 flat silver-titanium Geely 2023 shield centered in the adaptive-icon safe zone -->
     <group
-        android:scaleX="0.45"
-        android:scaleY="0.45"
-        android:translateX="12.6"
-        android:translateY="19.15">
+        android:scaleX="0.46"
+        android:scaleY="0.46"
+        android:translateX="22.72"
+        android:translateY="44.8">
         <path
-            android:pathData="M32,102 H152 M44,102 Q92,4 140,102 M68,102 V65 M92,102 V53 M116,102 V65"
-            android:strokeColor="#FFFFFFFF"
-            android:strokeWidth="12"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round" />
+            android:fillColor="#FFE4E9F2"
+            android:pathData="M10,1.4 L35.4,0.8 L36.3,15.5 L0.8,13.2 L0.6,10.2 C0.6,4.6 3.5,1.7 10,1.4 Z" />
+        <path
+            android:fillColor="#FFECF0F7"
+            android:pathData="M37.8,0.7 Q68,-0.2 98.2,0.7 L97.3,15.5 L68,17.5 L38.7,15.5 Z" />
+        <path
+            android:fillColor="#FFE4E9F2"
+            android:pathData="M100.6,0.8 L126,1.4 C132.5,1.7 135.4,4.6 135.4,10.2 L135.2,13.2 L99.7,15.5 Z" />
+        <path
+            android:fillColor="#FFD0D7E3"
+            android:pathData="M1.0,15.6 L36.5,17.9 L37.7,35.6 L14.0,32.2 C5.2,29.8 1.6,25.5 1.2,18.8 Z" />
+        <path
+            android:fillColor="#FFD8DFEA"
+            android:pathData="M38.9,18.0 L68,20.0 L97.1,18.0 L95.9,36.0 L72.5,39.4 Q68,40.0 63.5,39.4 L40.1,36.0 Z" />
+        <path
+            android:fillColor="#FFD0D7E3"
+            android:pathData="M99.5,17.9 L135.0,15.6 L134.8,18.8 C134.4,25.5 130.8,29.8 122.0,32.2 L98.3,35.6 Z" />
     </group>
 </vector>

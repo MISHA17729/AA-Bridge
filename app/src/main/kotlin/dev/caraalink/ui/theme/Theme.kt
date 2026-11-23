@@ -17,23 +17,23 @@ object Dash {
     val Tile = Color(0xFF161920)
     val TileBorder = Color(0xFF242934)
     val Track = Color(0xFF1E222B)
-    val Teal = Color(0xFF3370FF)
-    val Cyan = Color(0xFF5C8FFF)
+    val Teal = Color(0xFFE4E9F2)
+    val Cyan = Color(0xFFB8C1D0)
     val Success = Color(0xFF22B07D)
     val Amber = Color(0xFFE59A2B)
     val Orange = Color(0xFFD9821E)
     val Text = Color(0xFFF2F4F8)
     val Muted = Color(0xFF8C95A6)
-    val GlowTeal = Color(0xFF182238)
+    val GlowTeal = Color(0xFF1E222B)
     val GlowAmber = Color(0xFF261F14)
     val GlowIdle = Color(0xFF161920)
 }
 
 private val Scheme = darkColorScheme(
     primary = Dash.Teal,
-    onPrimary = Color(0xFFFFFFFF),
+    onPrimary = Color(0xFF0E1014),
     primaryContainer = Dash.GlowTeal,
-    onPrimaryContainer = Color(0xFFD6E2FF),
+    onPrimaryContainer = Color(0xFFE4E9F2),
     secondary = Dash.Cyan,
     onSecondary = Color(0xFF0B1528),
     tertiary = Dash.Amber,

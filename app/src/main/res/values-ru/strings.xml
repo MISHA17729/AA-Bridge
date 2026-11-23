@@ -26,7 +26,7 @@
     <string name="home_choose_car">Выбрать другой автомобиль</string>
     <string name="home_found_nearby">Рядом найден %1$s</string>
     <string name="home_wifi_off_title">Включите Wi-Fi</string>
-    <string name="home_wifi_off_body">Для связи с автомобилем AA Bridge нужен включённый Wi-Fi. Подключаться к сети не требуется.</string>
+    <string name="home_wifi_off_body">Для связи с автомобилем Geely Link нужен включённый Wi-Fi. Подключаться к сети не требуется.</string>
     <string name="home_wifi_settings">Настройки Wi-Fi</string>
     <string name="home_disconnect">Отключить</string>
     <string name="home_send_logs">Отправить логи</string>
@@ -54,14 +54,14 @@
     <string name="setup_server_title">Запустите сервер Android Auto</string>
     <string name="setup_server_body">Нажмите ⋮, затем «Запустить сервер головного устройства».</string>
     <string name="setup_car_title">Подключитесь к автомобилю</string>
-    <string name="setup_car_body">Подключите кабель, выберите AA Bridge и нажмите «Всегда». Либо подключитесь без кабеля.</string>
+    <string name="setup_car_body">Подключите кабель, выберите Geely Link и нажмите «Всегда». Либо подключитесь без кабеля.</string>
     <string name="nearby_title">Автомобили рядом</string>
     <string name="nearby_looking">Поиск автомобиля…</string>
     <string name="nearby_tap">Нажмите для подключения</string>
     <string name="nearby_your_car">Ваш автомобиль</string>
     <string name="nearby_hint">Нет в списке? Убедитесь, что экран авто включён и открыт раздел подключения телефона.</string>
     <string name="nearby_permission_title">Разрешите «Устройства поблизости»</string>
-    <string name="nearby_permission_body">AA Bridge требуется доступ к «Устройствам поблизости» для поиска автомобиля.</string>
+    <string name="nearby_permission_body">Geely Link требуется доступ к «Устройствам поблизости» для поиска автомобиля.</string>
     <string name="settings_wireless_car">Беспроводное авто</string>
     <string name="settings_forget">Забыть</string>
     <string name="settings_updates">Проверить обновления</string>
@@ -72,7 +72,7 @@
     <string name="help_tap_q">Нужно запустить Android Auto</string>
     <string name="help_tap_a">Сервер Android Auto останавливается после перезагрузки телефона. Нажмите на уведомление, затем ⋮ → «Запустить сервер головного устройства».</string>
     <string name="help_ask_q">Телефон спрашивает, какое приложение открыть</string>
-    <string name="help_ask_a">Выберите AA Bridge, затем «Всегда». Больше спрашивать не будет.</string>
+    <string name="help_ask_a">Выберите Geely Link, затем «Всегда». Больше спрашивать не будет.</string>
     <string name="help_setup_again">Пройти настройку заново</string>
     <string name="made_by">Автор: Ali Morgan</string>
     <string name="about_credit">На основе CarAALink от JObersi10</string>
@@ -85,7 +85,7 @@
     <string name="fgs_stop">Остановить</string>
     <string name="fgs_connected_wireless">Беспроводное подключение к %1$s</string>
     <string name="fgs_reconnecting_wireless">Переподключение к %1$s…</string>
-    <string name="wireless_open_to_reconnect">Откройте AA Bridge для переподключения к %1$s</string>
+    <string name="wireless_open_to_reconnect">Откройте Geely Link для переподключения к %1$s</string>
     <string name="ring_ready">Готов</string>
     <string name="ring_searching">Поиск</string>
     <string name="ring_connecting">Подключение</string>
@@ -102,9 +102,9 @@
     <string name="home_stop_server">Остановить сервер</string>
     <string name="open_aa_manual">Открыть Android Auto вручную</string>
     <string name="home_server_auto_stop">Автоотключение через %1$d мин без подключения</string>
-    <string name="a11y_server_label">Управление сервером AA Bridge</string>
+    <string name="a11y_server_label">Управление сервером Geely Link</string>
     <string name="a11y_server_description">Используется только в настройках Android Auto для нажатия «Запустить/Остановить сервер головного устройства».</string>
-    <string name="a11y_enable_toast">Включите AA Bridge в «Специальных возможностях» для управления сервером одной кнопкой</string>
+    <string name="a11y_enable_toast">Включите Geely Link в «Специальных возможностях» для управления сервером одной кнопкой</string>
     <string name="notif_idle_stop_title">Сервер Android Auto всё ещё запущен</string>
     <string name="notif_idle_stop_text">Машина не подключалась 1 час. Разблокируйте экран или нажмите, чтобы остановить сервер.</string>
 </resources>

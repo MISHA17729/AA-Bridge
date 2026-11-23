@@ -1,7 +1,7 @@
 package dev.caraalink.ui
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,11 +27,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,30 +43,14 @@ enum class RingMode { IDLE, SPIN, FULL, ALERT }
 /** Clean matte cabin background — no decorative radial glow. */
 fun Modifier.dashGlow(@Suppress("UNUSED_PARAMETER") glow: Color): Modifier = background(Dash.Background)
 
-/** Minimal 6-block geometric shield emblem inspired by modern Geely identity. */
+/** Flat silver-titanium Geely 2023 shield emblem (exact 3.4:1 vector). */
 @Composable
 fun GeelyEmblemMark(modifier: Modifier = Modifier) {
-    Canvas(modifier.size(width = 20.dp, height = 22.dp)) {
-        val gap = 2.dp.toPx()
-        val cellW = (size.width - gap) / 2f
-        val cellH = (size.height - gap * 2f) / 3f
-        val r = CornerRadius(1.8.dp.toPx(), 1.8.dp.toPx())
-        val colors = listOf(
-            Dash.Text, Dash.Teal,
-            Dash.Teal, Dash.Text,
-            Dash.Text.copy(alpha = 0.72f), Dash.Teal.copy(alpha = 0.85f),
-        )
-        for (row in 0 until 3) {
-            for (col in 0 until 2) {
-                drawRoundRect(
-                    color = colors[row * 2 + col],
-                    topLeft = Offset(col * (cellW + gap), row * (cellH + gap)),
-                    size = Size(cellW, cellH),
-                    cornerRadius = r,
-                )
-            }
-        }
-    }
+    Image(
+        painter = painterResource(R.drawable.ic_geely_emblem),
+        contentDescription = null,
+        modifier = modifier.size(width = 44.dp, height = 13.dp),
+    )
 }
 
 /** Kept for API compatibility; flat minimal indicator without neon glow. */
@@ -157,7 +139,7 @@ fun GlowButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+        Text(text, color = Color(0xFF0E1014), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
     }
 }
 
@@ -169,11 +151,11 @@ fun AmberButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier
             .fillMaxWidth()
             .height(52.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Dash.Amber)
+            .background(Dash.Teal)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = Color(0xFF141008), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+        Text(text, color = Color(0xFF0E1014), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
     }
 }
 
