@@ -288,9 +288,10 @@ private fun HomeActions(
         HomeState.SEARCHING, HomeState.CONNECTING -> DashLink(stringResource(R.string.home_use_another_car), onOpenNearby)
         HomeState.CONNECTED -> if (connection.link == CarLink.WIRELESS) DashLink(stringResource(R.string.home_disconnect)) { stopLink(context) }
         HomeState.NEEDS_TAP -> {
-            AmberButton(stringResource(R.string.home_start_server)) {
-                toggleHeadUnitServer(context, AaServerAccessibilityService.Action.START)
-            }
+            AmberButton(
+                stringResource(R.string.home_start_server),
+                { toggleHeadUnitServer(context, AaServerAccessibilityService.Action.START) },
+            )
             Spacer(Modifier.height(4.dp))
             DashLink(stringResource(R.string.open_aa_manual)) { AndroidAutoServer.openSettings(context) }
         }
