@@ -50,7 +50,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import dev.caraalink.R
+import dev.caraalink.aa.AaServerAccessibilityService
 import dev.caraalink.aa.AndroidAutoServer
+import dev.caraalink.aa.ServerIdleTimer
 import dev.caraalink.connection.CarLink
 import dev.caraalink.connection.ConnectionSnapshot
 import dev.caraalink.connection.ConnectionStateHolder
@@ -125,6 +127,14 @@ private fun stopLink(context: Context) {
     context.startService(Intent(context, UsbLinkForegroundService::class.java).setAction(UsbLinkForegroundService.ACTION_STOP))
 }
 
+private fun toggleHeadUnitServer(context: Context, action: AaServerAccessibilityService.Action) {
+    val started = AaServerAccessibilityService.requestAction(context, action, returnToApp = true)
+    if (!started) {
+        Toast.makeText(context, context.getString(R.string.a11y_enable_toast), Toast.LENGTH_LONG).show()
+        AaServerAccessibilityService.openAccessibilitySettings(context)
+    }
+}
+
 @Composable
 fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
     val context = LocalContext.current
@@ -135,6 +145,25 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
     val searchName = carToRetry(connection, AppSettings.wirelessCar(context))?.name
     val carName = connection.carName ?: searchName ?: stringResource(R.string.state_connected)
     val alert = state == HomeState.NEEDS_TAP || state == HomeState.NOT_FOUND || state == HomeState.WIFI_OFF
+
+    var idleRemainingMin by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(serverRunning, carConnected) {
+        when {
+            !serverRunning || carConnected -> {
+                if (!serverRunning) ServerIdleTimer.cancel(context)
+                idleRemainingMin = null
+            }
+            else -> {
+                if (ServerIdleTimer.remainingMinutes(context) == null) {
+                    ServerIdleTimer.arm(context)
+                }
+                while (true) {
+                    idleRemainingMin = ServerIdleTimer.remainingMinutes(context)
+                    delay(15_000L)
+                }
+            }
+        }
+    }
 
     Column(
         Modifier
@@ -190,6 +219,17 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
             Text(title, style = MaterialTheme.typography.headlineMedium, color = Dash.Text, textAlign = TextAlign.Center)
             Spacer(Modifier.height(6.dp))
             Text(stringResource(body), style = MaterialTheme.typography.bodyLarge, color = Dash.Muted, textAlign = TextAlign.Center)
+            if (serverRunning && !carConnected) {
+                idleRemainingMin?.let { mins ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        stringResource(R.string.home_server_auto_stop, mins),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Dash.Muted,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
             if (state == HomeState.NEEDS_TAP) {
                 Spacer(Modifier.height(20.dp))
                 MenuHint(stringResource(R.string.menu_start_server))
@@ -221,7 +261,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                 Telltale(painterResource(R.drawable.ic_car), stringResource(R.string.tile_car), if (carConnected) Lamp.ON else Lamp.OFF)
             }
             Spacer(Modifier.height(16.dp))
-            HomeActions(state, connection, onOpenNearby)
+            HomeActions(state, serverRunning, carConnected, connection, onOpenNearby)
             SendLogsLink()
         }
     }
@@ -229,22 +269,50 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
 
 /** The main and secondary actions; each state offers its own next step. */
 @Composable
-private fun HomeActions(state: HomeState, connection: ConnectionSnapshot, onOpenNearby: () -> Unit) {
+private fun HomeActions(
+    state: HomeState,
+    serverRunning: Boolean,
+    carConnected: Boolean,
+    connection: ConnectionSnapshot,
+    onOpenNearby: () -> Unit,
+) {
     val context = LocalContext.current
     when (state) {
-        HomeState.READY -> GlowButton(stringResource(R.string.home_connect_wireless), onOpenNearby)
+        HomeState.READY -> {
+            GlowButton(stringResource(R.string.home_connect_wireless), onOpenNearby)
+            Spacer(Modifier.height(4.dp))
+            DashLink(stringResource(R.string.home_stop_server)) {
+                toggleHeadUnitServer(context, AaServerAccessibilityService.Action.STOP)
+            }
+        }
         HomeState.SEARCHING, HomeState.CONNECTING -> DashLink(stringResource(R.string.home_use_another_car), onOpenNearby)
         HomeState.CONNECTED -> if (connection.link == CarLink.WIRELESS) DashLink(stringResource(R.string.home_disconnect)) { stopLink(context) }
-        HomeState.NEEDS_TAP -> AmberButton(stringResource(R.string.open_aa), { AndroidAutoServer.openSettings(context) })
+        HomeState.NEEDS_TAP -> {
+            AmberButton(stringResource(R.string.home_start_server)) {
+                toggleHeadUnitServer(context, AaServerAccessibilityService.Action.START)
+            }
+            Spacer(Modifier.height(4.dp))
+            DashLink(stringResource(R.string.open_aa_manual)) { AndroidAutoServer.openSettings(context) }
+        }
         HomeState.NOT_FOUND -> {
             GlowButton(stringResource(R.string.home_try_again), { retryWireless(context, connection) })
             Spacer(Modifier.height(4.dp))
             DashLink(stringResource(R.string.home_choose_car), onOpenNearby)
+            if (serverRunning && !carConnected) {
+                DashLink(stringResource(R.string.home_stop_server)) {
+                    toggleHeadUnitServer(context, AaServerAccessibilityService.Action.STOP)
+                }
+            }
         }
         HomeState.WIFI_OFF -> {
             AmberButton(stringResource(R.string.home_wifi_settings), { context.startActivity(Intent(Settings.Panel.ACTION_WIFI)) })
             Spacer(Modifier.height(4.dp))
             DashLink(stringResource(R.string.home_try_again)) { retryWireless(context, connection) }
+            if (serverRunning && !carConnected) {
+                DashLink(stringResource(R.string.home_stop_server)) {
+                    toggleHeadUnitServer(context, AaServerAccessibilityService.Action.STOP)
+                }
+            }
         }
     }
 }
