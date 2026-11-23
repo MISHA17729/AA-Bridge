@@ -103,4 +103,14 @@
     <string name="tile_link">Link</string>
     <string name="link_wireless_short">Wireless</string>
     <string name="link_cable_short">Cable</string>
+    <string name="home_start_server">Start server</string>
+    <string name="home_stop_server">Stop server</string>
+    <string name="open_aa_manual">Open Android Auto manually</string>
+    <string name="home_server_auto_stop">Auto-stop in %1$d min if no car connects</string>
+    <string name="a11y_server_label">AA Bridge Server Control</string>
+    <string name="a11y_server_description">Used only inside Android Auto settings to press Start/Stop head unit server on your behalf.</string>
+    <string name="a11y_enable_toast">Enable AA Bridge in Accessibility settings for one-tap server control</string>
+    <string name="notif_idle_stop_title">Android Auto server is still running</string>
+    <string name="notif_idle_stop_text">No car connected for 1 hour. Unlock or tap to stop the server.</string>
 </resources>
+

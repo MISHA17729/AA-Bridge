@@ -1,9 +1,17 @@
 package dev.caraalink
 
 import android.app.Application
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.os.Process
 import android.util.Log
+import dev.caraalink.aa.ServerIdleTimer
+import dev.caraalink.connection.ConnectionStateHolder
 import dev.caraalink.diagnostics.DiagnosticLogger
+import dev.caraalink.ui.isCarConnected
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
@@ -20,11 +28,21 @@ import java.io.InputStreamReader
 class CarAALinkApplication : Application() {
 
     private val logger by lazy { DiagnosticLogger(this, "app") }
+    @Volatile private var wasCarConnected = false
+
+    private val unlockReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_USER_PRESENT) {
+                ServerIdleTimer.tryPendingStopOnUnlock(context)
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         installCrashLogger()
         startSelfLogcatCapture()
+        setupServerIdleTracking()
         dev.caraalink.settings.AppSettings.applyFastVideoDefaults(this)
         // Carry a previous crash's full trace into THIS launch's own log
         // file (a new file per launch -- see DiagnosticLogger.currentFile())
@@ -40,6 +58,24 @@ class CarAALinkApplication : Application() {
         // silently didn't take (older APK still running). Stamping the
         // exact build identity at startup removes that ambiguity for good.
         logger.log("CarAALinkApplication.onCreate build=${dev.caraalink.BuildConfig.GIT_SHA} versionName=${dev.caraalink.BuildConfig.VERSION_NAME}")
+    }
+
+    private fun setupServerIdleTracking() {
+        wasCarConnected = ConnectionStateHolder.snapshot.phase.isCarConnected()
+        ConnectionStateHolder.addListener { snapshot ->
+            val connected = snapshot.phase.isCarConnected()
+            if (connected != wasCarConnected) {
+                wasCarConnected = connected
+                ServerIdleTimer.onCarConnectionChanged(this, connected)
+            }
+        }
+        val filter = IntentFilter(Intent.ACTION_USER_PRESENT)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(unlockReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(unlockReceiver, filter)
+        }
     }
 
     /**

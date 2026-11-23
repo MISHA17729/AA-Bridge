@@ -98,4 +98,14 @@
     <string name="tile_link">Связь</string>
     <string name="link_wireless_short">Wi-Fi</string>
     <string name="link_cable_short">Кабель</string>
+    <string name="home_start_server">Запустить сервер</string>
+    <string name="home_stop_server">Остановить сервер</string>
+    <string name="open_aa_manual">Открыть Android Auto вручную</string>
+    <string name="home_server_auto_stop">Автоотключение через %1$d мин без подключения</string>
+    <string name="a11y_server_label">Управление сервером AA Bridge</string>
+    <string name="a11y_server_description">Используется только в настройках Android Auto для нажатия «Запустить/Остановить сервер головного устройства».</string>
+    <string name="a11y_enable_toast">Включите AA Bridge в «Специальных возможностях» для управления сервером одной кнопкой</string>
+    <string name="notif_idle_stop_title">Сервер Android Auto всё ещё запущен</string>
+    <string name="notif_idle_stop_text">Машина не подключалась 1 час. Разблокируйте экран или нажмите, чтобы остановить сервер.</string>
 </resources>
+
