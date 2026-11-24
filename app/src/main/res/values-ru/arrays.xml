@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="resolution_mode_entries">
+        <item>По экрану авто (авто)</item>
+        <item>Вручную</item>
+    </string-array>
+
+    <string-array name="car_orientation_entries">
+        <item>Определять автоматически</item>
+        <item>Альбомная (широкий экран)</item>
+        <item>Портретная (вертикальный экран)</item>
+    </string-array>
+
+    <string-array name="frame_rate_entries">
+        <item>24 кадра/с (экономия заряда)</item>
+        <item>30 кадров/с (оптимально)</item>
+        <item>60 кадров/с (больше расход)</item>
+    </string-array>
+
+    <string-array name="sample_rate_entries">
+        <item>44,1 кГц</item>
+        <item>48 кГц</item>
+    </string-array>
+
+    <string-array name="aa_fill_mode_entries">
+        <item>Вписать (всё видно, чёрные полосы по краям)</item>
+        <item>Заполнить (на весь экран, лёгкая обрезка)</item>
+    </string-array>
+
+    <string-array name="aa_audio_route_entries">
+        <item>Bluetooth авто, иначе динамик телефона</item>
+        <item>Всегда микрофон и динамик телефона</item>
+        <item>Звук и подсказки через Bluetooth телефона (рекомендуется)</item>
+    </string-array>
+
+    <string-array name="usb_role_entries">
+        <item>Авто (рекомендуется: аксессуар)</item>
+        <item>Принудительно аксессуар</item>
+        <item>Принудительно хост</item>
+    </string-array>
+
+    <string-array name="server_idle_timeout_entries">
+        <item>10 минут</item>
+        <item>15 минут</item>
+        <item>30 минут</item>
+        <item>60 минут</item>
+    </string-array>
+</resources>

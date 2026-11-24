@@ -119,6 +119,56 @@
     <string name="home_connect_wired">Connect via USB</string>
     <string name="usb_permission_hint">Allow USB access on the pop-up dialog</string>
     <string name="usb_not_found_toast">Car not detected on USB. Check the cable and open Phone Link on the car screen.</string>
+    <string name="pref_cat_video">Video</string>
+    <string name="pref_car_orientation_title">Car screen shape</string>
+    <string name="pref_car_orientation_summary">Detected from your head unit automatically</string>
+    <string name="pref_resolution_mode_title">Resolution</string>
+    <string name="pref_resolution_mode_summary">Match the head unit display or set manually</string>
+    <string name="pref_custom_width_title">Custom width (px)</string>
+    <string name="pref_custom_height_title">Custom height (px)</string>
+    <string name="pref_frame_rate_title">Target frame rate</string>
+    <string name="pref_frame_rate_summary">24–30 fps saves battery and reduces heat</string>
+    <string name="pref_bitrate_title">Video bitrate (kbps)</string>
+    <string name="pref_bitrate_summary">Lower bitrate (3500–4000) saves battery over Wi-Fi</string>
+    <string name="pref_dpi_auto_title">Auto-detect DPI</string>
+    <string name="pref_dpi_auto_summary">Automatically scale interface size for the car screen</string>
+    <string name="pref_dpi_manual_title">Manual DPI</string>
+    <string name="pref_dpi_manual_summary">Used only when auto-detect is off</string>
+    <string name="pref_cat_audio">Audio</string>
+    <string name="pref_sample_rate_title">Sample rate</string>
+    <string name="pref_audio_stereo_title">Stereo</string>
+    <string name="pref_cat_aa">Android Auto</string>
+    <string name="pref_car_profiles_title">Car profiles</string>
+    <string name="pref_car_profiles_summary">Save and load display settings per car</string>
+    <string name="pref_downscale_title">Downscale to 720p</string>
+    <string name="pref_downscale_summary">Saves battery and keeps navigation crisp</string>
+    <string name="pref_fill_mode_title">Car screen fill</string>
+    <string name="pref_fill_mode_summary">Fit with borders or fill edge to edge</string>
+    <string name="pref_audio_route_title">Mic and audio route</string>
+    <string name="pref_audio_route_summary">Which device handles music, prompts and voice</string>
+    <string name="pref_auto_crop_title">Auto-crop to car screen</string>
+    <string name="pref_auto_crop_summary">Automatically match wide head unit proportions</string>
+    <string name="pref_cat_connection">Connection and battery</string>
+    <string name="pref_idle_timeout_title">Auto-stop server after</string>
+    <string name="pref_idle_timeout_summary">Stops Android Auto server if no car connects</string>
+    <string name="pref_auto_reconnect_title">Auto-reconnect USB</string>
+    <string name="pref_auto_reconnect_summary">Reconnect automatically if the USB link drops</string>
+    <string name="pref_usb_role_title">USB role (debug)</string>
+    <string name="pref_usb_role_summary">Keep on Auto for normal use</string>
+    <string name="pref_cat_updates">Updates</string>
+    <string name="pref_update_auto_title">Check for updates automatically</string>
+    <string name="pref_update_auto_summary">Notify when a newer version is released</string>
+    <string name="pref_update_now_title">Check for updates now</string>
+    <string name="pref_cat_debug">Diagnostics</string>
+    <string name="pref_verbose_log_title">Background logging (logcat)</string>
+    <string name="pref_verbose_log_summary">Off by default to save battery. Enable only for troubleshooting</string>
+    <string name="pref_debug_overlay_title">On-screen FPS overlay</string>
+    <string name="pref_debug_overlay_summary">Show frame rate and bitrate stats over the video</string>
+    <string name="pref_crash_log_title">Auto-save crash log</string>
+    <string name="pref_crash_log_summary">Save crash details to Downloads if the app crashes</string>
+    <string name="pref_dev_tools_title">Developer tools</string>
+    <string name="pref_dev_tools_summary">Log export and on-phone car preview</string>
 </resources>
+
 
 

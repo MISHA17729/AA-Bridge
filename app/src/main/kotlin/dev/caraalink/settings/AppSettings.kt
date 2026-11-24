@@ -70,7 +70,7 @@ object AppSettings {
         prefs(context).getString("video_frame_rate", "30")?.toIntOrNull() ?: 30
 
     fun videoBitrateKbps(context: Context): Int =
-        prefs(context).getString("video_bitrate_kbps", "6000")?.toIntOrNull() ?: 6000
+        prefs(context).getString("video_bitrate_kbps", "4000")?.toIntOrNull() ?: 4000
 
     /**
      * Auto-detect replicates the exact formula CarDisplay.attach() already
@@ -187,4 +187,7 @@ object AppSettings {
             "connection_mode",
             if (mode == ConnectionMode.CABLE) "cable" else "wireless",
         ).apply()
+
+    fun serverIdleTimeoutMinutes(context: Context): Long =
+        prefs(context).getString("server_idle_timeout_min", "15")?.toLongOrNull()?.coerceIn(5L, 120L) ?: 15L
 }

@@ -21,7 +21,7 @@
     </string-array>
 
     <string-array name="frame_rate_entries">
-        <item>24 fps</item>
+        <item>24 fps (battery saver)</item>
         <item>30 fps</item>
         <item>60 fps</item>
     </string-array>
@@ -60,11 +60,6 @@
         <item>phone_direct</item>
     </string-array>
 
-    <!--
-      USB role is CONFIRMED (see claude/roadmap.md): phone is the accessory,
-      head unit is the host. This override exists for debugging only — do
-      not flip it on real hardware unless you know why.
-    -->
     <string-array name="usb_role_entries">
         <item>Auto (confirmed: accessory)</item>
         <item>Force accessory</item>
@@ -74,5 +69,18 @@
         <item>auto</item>
         <item>accessory</item>
         <item>host</item>
+    </string-array>
+
+    <string-array name="server_idle_timeout_entries">
+        <item>10 minutes</item>
+        <item>15 minutes</item>
+        <item>30 minutes</item>
+        <item>60 minutes</item>
+    </string-array>
+    <string-array name="server_idle_timeout_values">
+        <item>10</item>
+        <item>15</item>
+        <item>30</item>
+        <item>60</item>
     </string-array>
 </resources>

@@ -17,6 +17,7 @@ import androidx.core.app.NotificationCompat
 import dev.caraalink.MainActivity
 import dev.caraalink.R
 import dev.caraalink.connection.ConnectionStateHolder
+import dev.caraalink.settings.AppSettings
 import dev.caraalink.ui.isCarConnected
 import kotlin.math.ceil
 
@@ -49,7 +50,7 @@ object ServerIdleTimer {
         )
     }
 
-    fun arm(context: Context, delayMs: Long = IDLE_TIMEOUT_MS) {
+    fun arm(context: Context, delayMs: Long = AppSettings.serverIdleTimeoutMinutes(context) * 60_000L) {
         val appContext = context.applicationContext
         val deadlineWall = System.currentTimeMillis() + delayMs
         prefs(appContext).edit()

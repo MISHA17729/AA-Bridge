@@ -114,6 +114,56 @@
     <string name="home_connect_wired">Подключиться по USB</string>
     <string name="usb_permission_hint">Подтвердите доступ к USB во всплывающем окне</string>
     <string name="usb_not_found_toast">Автомобиль по USB не обнаружен. Проверьте кабель и откройте экран подключения в авто.</string>
+    <string name="pref_cat_video">Видео и экономия заряда</string>
+    <string name="pref_car_orientation_title">Ориентация экрана авто</string>
+    <string name="pref_car_orientation_summary">Определяется автоматически по магнитоле</string>
+    <string name="pref_resolution_mode_title">Разрешение</string>
+    <string name="pref_resolution_mode_summary">Подстраивать под экран авто или задать вручную</string>
+    <string name="pref_custom_width_title">Ширина вручную (пикс.)</string>
+    <string name="pref_custom_height_title">Высота вручную (пикс.)</string>
+    <string name="pref_frame_rate_title">Частота кадров (FPS)</string>
+    <string name="pref_frame_rate_summary">24–30 кадров/с экономят батарею и снижают нагрев</string>
+    <string name="pref_bitrate_title">Битрейт видео (кбит/с)</string>
+    <string name="pref_bitrate_summary">3500–4000 кбит/с снижают расход батареи по Wi-Fi</string>
+    <string name="pref_dpi_auto_title">Автомасштаб (DPI)</string>
+    <string name="pref_dpi_auto_summary">Подбирает размер кнопок под экран автомобиля</string>
+    <string name="pref_dpi_manual_title">Масштаб DPI вручную</string>
+    <string name="pref_dpi_manual_summary">Работает только при выключенном автомасштабе</string>
+    <string name="pref_cat_audio">Звук</string>
+    <string name="pref_sample_rate_title">Частота дискретизации</string>
+    <string name="pref_audio_stereo_title">Стерео</string>
+    <string name="pref_cat_aa">Android Auto</string>
+    <string name="pref_car_profiles_title">Профили автомобилей</string>
+    <string name="pref_car_profiles_summary">Сохранение и загрузка настроек экрана для разных авто</string>
+    <string name="pref_downscale_title">Снижать разрешение до 720p</string>
+    <string name="pref_downscale_summary">Экономит заряд батареи и ускоряет работу карт</string>
+    <string name="pref_fill_mode_title">Заполнение экрана авто</string>
+    <string name="pref_fill_mode_summary">Вписать целиком или растянуть на весь экран</string>
+    <string name="pref_audio_route_title">Звук и микрофон</string>
+    <string name="pref_audio_route_summary">Куда выводить музыку, подсказки и звонки</string>
+    <string name="pref_auto_crop_title">Автообрезка под экран авто</string>
+    <string name="pref_auto_crop_summary">Подстраивает пропорции картинки под широкий дисплей</string>
+    <string name="pref_cat_connection">Подключение и батарея</string>
+    <string name="pref_idle_timeout_title">Автоотключение сервера</string>
+    <string name="pref_idle_timeout_summary">Выключает сервер Android Auto при простое без машины</string>
+    <string name="pref_auto_reconnect_title">Автопереподключение по USB</string>
+    <string name="pref_auto_reconnect_summary">Восстанавливать связь при кратковременном обрыве кабеля</string>
+    <string name="pref_usb_role_title">Режим USB (отладка)</string>
+    <string name="pref_usb_role_summary">Оставьте «Авто» для обычной работы</string>
+    <string name="pref_cat_updates">Обновления</string>
+    <string name="pref_update_auto_title">Проверять обновления автоматически</string>
+    <string name="pref_update_auto_summary">Уведомлять при выходе новой версии</string>
+    <string name="pref_update_now_title">Проверить обновления сейчас</string>
+    <string name="pref_cat_debug">Диагностика</string>
+    <string name="pref_verbose_log_title">Фоновая запись логов (logcat)</string>
+    <string name="pref_verbose_log_summary">Выключена для экономии заряда. Включайте только при поиске ошибок</string>
+    <string name="pref_debug_overlay_title">Счётчик FPS поверх экрана</string>
+    <string name="pref_debug_overlay_summary">Показывать частоту кадров и битрейт поверх видео</string>
+    <string name="pref_crash_log_title">Сохранять отчёт при сбое</string>
+    <string name="pref_crash_log_summary">Автоматически сохранять лог в «Загрузки» при вылете приложения</string>
+    <string name="pref_dev_tools_title">Инструменты разработчика</string>
+    <string name="pref_dev_tools_summary">Экспорт логов и предпросмотр экрана авто</string>
 </resources>
+
 
 
