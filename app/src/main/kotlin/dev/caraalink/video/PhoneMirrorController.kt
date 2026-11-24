@@ -9,19 +9,27 @@ import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Handler
 import android.os.Looper
+import android.util.DisplayMetrics
 import android.util.Log
+import android.view.Display
 import android.view.Surface
-import android.view.WindowManager
 
 /**
  * Mirrors the phone's own screen directly into [CarVideoEncoder]'s input surface
- * via Android's MediaProjection API, and maps car touchscreen coordinates back to
- * the phone's physical screen coordinates for AccessibilityService gesture dispatch.
+ * via Android's MediaProjection API.
+ *
+ * Android 14+ enforces strictly single-use MediaProjection consent tokens:
+ * [permissionData] is consumed once in [start] and immediately cleared so the
+ * next session cleanly asks for a fresh consent dialog instead of crashing with
+ * SecurityException. Within an already-active session, [updateSurface] reuses
+ * the live [MediaProjection] if the car sends a new CONFIG_CAPTURE.
  */
 object PhoneMirrorController {
     private const val TAG = "PhoneMirrorController"
 
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val lock = Any()
+
     @Volatile private var permissionResultCode: Int = 0
     @Volatile private var permissionData: Intent? = null
     @Volatile private var projection: MediaProjection? = null
@@ -30,71 +38,82 @@ object PhoneMirrorController {
     @Volatile var isActive: Boolean = false
         private set
 
-    fun hasPermission(): Boolean = permissionResultCode == Activity.RESULT_OK && permissionData != null
+    /** True if we have either a live projection or a fresh unused consent token. */
+    fun hasPermission(): Boolean = synchronized(lock) {
+        projection != null || (permissionResultCode == Activity.RESULT_OK && permissionData != null)
+    }
 
-    fun setPermission(resultCode: Int, data: Intent?) {
+    fun setPermission(resultCode: Int, data: Intent?) = synchronized(lock) {
         if (resultCode == Activity.RESULT_OK && data != null) {
             permissionResultCode = resultCode
             permissionData = Intent(data)
-            Log.i(TAG, "Screen capture permission stored")
+            Log.i(TAG, "Fresh screen capture consent stored")
         } else {
-            clearPermission()
+            clearTokenLocked()
         }
     }
 
-    fun clearPermission() {
+    private fun clearTokenLocked() {
         permissionResultCode = 0
         permissionData = null
     }
 
     /**
-     * Starts mirroring the phone screen onto [surface] at [width]x[height].
-     * Must be called while a foreground service with type mediaProjection is active.
+     * Attaches [surface] at [width]x[height] to the live MediaProjection, or
+     * creates one from the stored single-use consent token.
      */
-    fun start(context: Context, surface: Surface, width: Int, height: Int): Boolean {
+    fun startOrUpdate(context: Context, surface: Surface, width: Int, height: Int): Boolean = synchronized(lock) {
+        val dpi = context.resources.displayMetrics.densityDpi.coerceIn(160, 480)
+
+        // Reuse live projection if this is a mid-session encoder rebuild.
+        val existingProjection = projection
+        if (existingProjection != null) {
+            runCatching { virtualDisplay?.release() }
+            virtualDisplay = null
+            val vd = createMirrorDisplay(existingProjection, surface, width, height, dpi)
+            if (vd != null) {
+                virtualDisplay = vd
+                isActive = true
+                Log.i(TAG, "Reattached live MediaProjection to ${width}x${height}")
+                return true
+            }
+            stopLocked()
+            return false
+        }
+
         val data = permissionData ?: return false
-        if (permissionResultCode != Activity.RESULT_OK) return false
-        stop()
+        val resultCode = permissionResultCode
+        if (resultCode != Activity.RESULT_OK) return false
+
+        // Consume token immediately — Android 14+ rejects reusing it.
+        clearTokenLocked()
 
         val mpm = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
             ?: return false
         val mp = try {
-            mpm.getMediaProjection(permissionResultCode, Intent(data))
+            mpm.getMediaProjection(resultCode, data)
         } catch (e: Exception) {
             Log.e(TAG, "getMediaProjection failed", e)
-            clearPermission()
             null
         } ?: return false
 
-        // Android 14+ requires registering a callback before createVirtualDisplay.
         mp.registerCallback(object : MediaProjection.Callback() {
             override fun onStop() {
                 Log.i(TAG, "MediaProjection stopped by system")
-                isActive = false
-                virtualDisplay?.release()
-                virtualDisplay = null
-                projection = null
+                synchronized(lock) {
+                    isActive = false
+                    runCatching { virtualDisplay?.release() }
+                    virtualDisplay = null
+                    projection = null
+                }
             }
         }, mainHandler)
 
-        val dpi = context.resources.displayMetrics.densityDpi.coerceIn(160, 480)
-        val vd = try {
-            mp.createVirtualDisplay(
-                "GeelyLinkMirror",
-                width,
-                height,
-                dpi,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                surface,
-                null,
-                mainHandler,
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "createVirtualDisplay failed", e)
+        val vd = createMirrorDisplay(mp, surface, width, height, dpi)
+        if (vd == null) {
             runCatching { mp.stop() }
-            clearPermission()
-            null
-        } ?: return false
+            return false
+        }
 
         projection = mp
         virtualDisplay = vd
@@ -103,12 +122,39 @@ object PhoneMirrorController {
         return true
     }
 
-    fun stop() {
+    private fun createMirrorDisplay(
+        mp: MediaProjection,
+        surface: Surface,
+        width: Int,
+        height: Int,
+        dpi: Int,
+    ): VirtualDisplay? = try {
+        mp.createVirtualDisplay(
+            "GeelyLinkMirror",
+            width,
+            height,
+            dpi,
+            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+            surface,
+            null,
+            mainHandler,
+        )
+    } catch (e: Exception) {
+        Log.e(TAG, "createVirtualDisplay failed", e)
+        null
+    }
+
+    fun stop() = synchronized(lock) {
+        stopLocked()
+    }
+
+    private fun stopLocked() {
         isActive = false
         runCatching { virtualDisplay?.release() }
         virtualDisplay = null
         runCatching { projection?.stop() }
         projection = null
+        clearTokenLocked()
     }
 
     /**
@@ -133,17 +179,22 @@ object PhoneMirrorController {
         val offsetX = (carW - drawnW) / 2f
         val offsetY = (carH - drawnH) / 2f
 
-        val px = ((carX - offsetX) / scale).coerceIn(0f, (phoneW - 1).toFloat())
-        val py = ((carY - offsetY) / scale).coerceIn(0f, (phoneH - 1).toFloat())
+        val px = ((carX - offsetX) / scale).coerceIn(1f, (phoneW - 2).toFloat())
+        val py = ((carY - offsetY) / scale).coerceIn(1f, (phoneH - 2).toFloat())
         return px to py
     }
 
     private fun currentPhoneScreenSize(context: Context): Pair<Int, Int> {
-        val wm = context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
-        if (wm != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            val bounds = wm.currentWindowMetrics.bounds
-            if (bounds.width() > 0 && bounds.height() > 0) {
-                return bounds.width() to bounds.height()
+        runCatching {
+            val dm = context.getSystemService(DisplayManager::class.java)
+            val display = dm?.getDisplay(Display.DEFAULT_DISPLAY)
+            if (display != null) {
+                val metrics = DisplayMetrics()
+                @Suppress("DEPRECATION")
+                display.getRealMetrics(metrics)
+                if (metrics.widthPixels > 0 && metrics.heightPixels > 0) {
+                    return metrics.widthPixels to metrics.heightPixels
+                }
             }
         }
         val dm = context.resources.displayMetrics

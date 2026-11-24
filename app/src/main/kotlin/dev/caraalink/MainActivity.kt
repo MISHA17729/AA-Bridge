@@ -8,6 +8,8 @@ import android.hardware.usb.UsbAccessory
 import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -18,11 +20,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import dev.caraalink.aa.AaServerAccessibilityService
 import dev.caraalink.aa.AaSessionProbe
 import dev.caraalink.aa.AaTlsReceiver
 import dev.caraalink.aa.AaVersionProbe
+import dev.caraalink.aa.AndroidAutoServer
 import dev.caraalink.connection.ConnectionStateHolder
-import dev.caraalink.service.UsbLinkForegroundService
 import dev.caraalink.settings.AppSettings
 import dev.caraalink.ui.AboutScreen
 import dev.caraalink.ui.HelpScreen
@@ -42,6 +45,8 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val TAG = "MainActivity"
     }
+
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private val usbPermissionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -190,20 +195,35 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        // Never collide with an in-progress server toggle or an active connection.
+        if (AaServerAccessibilityService.isBusy()) return
         val snapshot = ConnectionStateHolder.snapshot
         if (snapshot.phase.isCarConnected()) return
 
-        // If a USB car accessory is physically attached, cable always wins.
+        // Mirror mode requires a fresh user-confirmed screen capture dialog, so never auto-connect silently.
+        if (AppSettings.displayMode(this) == AppSettings.DisplayMode.MIRROR) return
+
+        // If a USB car accessory is physically attached in Android Auto mode, cable wins.
         if (UsbCableConnector.connectIfPermitted(this)) {
             AppSettings.setConnectionMode(this, AppSettings.ConnectionMode.CABLE)
             return
         }
 
-        // Only auto-start wireless search when Wireless mode is selected.
+        // Only auto-start wireless search when Wireless mode is selected AND AA server is already running.
         if (AppSettings.connectionMode(this) == AppSettings.ConnectionMode.WIRELESS) {
             val canScan = checkSelfPermission(dev.caraalink.ui.NEARBY_PERMISSION) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            if (canScan && dev.caraalink.ui.shouldAutoConnect(snapshot, AppSettings.wirelessCar(this) != null)) {
-                dev.caraalink.ui.startWireless(this)
+            val hasCar = AppSettings.wirelessCar(this) != null
+            if (canScan && dev.caraalink.ui.shouldAutoConnect(snapshot, hasCar)) {
+                Thread({
+                    if (AndroidAutoServer.isRunning()) {
+                        mainHandler.post {
+                            val current = ConnectionStateHolder.snapshot
+                            if (!isFinishing && !isDestroyed && dev.caraalink.ui.shouldAutoConnect(current, AppSettings.wirelessCar(this) != null)) {
+                                dev.caraalink.ui.startWireless(this)
+                            }
+                        }
+                    }
+                }, "aa-onstart-check").start()
             }
         }
     }
