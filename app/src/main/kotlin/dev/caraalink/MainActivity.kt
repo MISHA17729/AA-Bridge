@@ -1,8 +1,12 @@
 package dev.caraalink
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.hardware.usb.UsbAccessory
 import android.hardware.usb.UsbManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -17,6 +21,7 @@ import androidx.compose.runtime.setValue
 import dev.caraalink.aa.AaSessionProbe
 import dev.caraalink.aa.AaTlsReceiver
 import dev.caraalink.aa.AaVersionProbe
+import dev.caraalink.connection.ConnectionStateHolder
 import dev.caraalink.service.UsbLinkForegroundService
 import dev.caraalink.settings.AppSettings
 import dev.caraalink.ui.AboutScreen
@@ -25,7 +30,9 @@ import dev.caraalink.ui.HomeScreen
 import dev.caraalink.ui.NearbyCarsScreen
 import dev.caraalink.ui.SettingsScreen
 import dev.caraalink.ui.SetupScreen
+import dev.caraalink.ui.isCarConnected
 import dev.caraalink.ui.theme.AaBridgeTheme
+import dev.caraalink.usb.UsbCableConnector
 
 enum class Screen { SETUP, HOME, SETTINGS, HELP, ABOUT, NEARBY }
 
@@ -36,13 +43,36 @@ class MainActivity : ComponentActivity() {
         private const val TAG = "MainActivity"
     }
 
+    private val usbPermissionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action != UsbCableConnector.ACTION_USB_PERMISSION) return
+            val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+            @Suppress("DEPRECATION")
+            val accessory = intent.getParcelableExtra<UsbAccessory>(UsbManager.EXTRA_ACCESSORY)
+                ?: UsbCableConnector.attachedAccessory(context)
+            if (granted && accessory != null) {
+                Log.i(TAG, "USB permission granted -- starting wired session")
+                AppSettings.setConnectionMode(context, AppSettings.ConnectionMode.CABLE)
+                UsbCableConnector.startSession(context, accessory)
+            } else {
+                Log.w(TAG, "USB permission denied or accessory gone")
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // The app is always dark, so the system bar icons stay light even in the phone's light mode.
         enableEdgeToEdge(
             androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
+        val usbFilter = IntentFilter(UsbCableConnector.ACTION_USB_PERMISSION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(usbPermissionReceiver, usbFilter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(usbPermissionReceiver, usbFilter)
+        }
         Log.i(TAG, "onCreate: launch intent action=${intent?.action} extras=${intent?.extras}")
         dev.caraalink.diagnostics.CrashMarker.consumeLastCrash(this)?.let { summary ->
             Toast.makeText(this, "Restarted after a crash: $summary", Toast.LENGTH_LONG).show()
@@ -85,19 +115,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Debug-build-only headless entry point for the AA TLS receiver, so it can
-     * be driven over adb rather than by tapping Developer Tools:
-     *
-     *   adb shell am start -n io.github.alimorgaan.aabridge/dev.caraalink.MainActivity --es aa_tls start \
-     *       [--es aa_mode dial|listen] [--es aa_role server|client|auto] \
-     *       [--ei aa_port 5277] [--es aa_host 127.0.0.1]
-     *
-     *   adb shell am start -n io.github.alimorgaan.aabridge/dev.caraalink.MainActivity --es aa_tls stop
-     *
-     * Refuses to do anything outside a debuggable build, so a release APK
-     * can't be poked into opening a listener from the shell.
-     */
+    override fun onDestroy() {
+        runCatching { unregisterReceiver(usbPermissionReceiver) }
+        super.onDestroy()
+    }
+
     private fun maybeStartAaTls(intent: Intent?) {
         val probe = intent?.getStringExtra("aa_probe")
         if (probe != null) {
@@ -162,21 +184,27 @@ class MainActivity : ComponentActivity() {
         @Suppress("DEPRECATION")
         val accessory = intent.getParcelableExtra<UsbAccessory>(UsbManager.EXTRA_ACCESSORY) ?: return
         Log.i(TAG, "maybeAutoStartOnAttach: launched via attach intent, starting car session")
-        val serviceIntent = Intent(this, UsbLinkForegroundService::class.java)
-            .setAction(UsbLinkForegroundService.ACTION_START_SESSION)
-            .putExtra(UsbManager.EXTRA_ACCESSORY, accessory)
-        startForegroundService(serviceIntent)
+        AppSettings.setConnectionMode(this, AppSettings.ConnectionMode.CABLE)
+        UsbCableConnector.startSession(this, accessory)
     }
 
-    // When the app is already running, picking it in the USB chooser delivers
-    // the attach intent here instead of onCreate.
     override fun onStart() {
         super.onStart()
-        // Opening the app connects to the remembered car; the cable and a running attempt both win.
-        // Without Nearby devices the scan can only fail; Home's Connect without a cable asks for it instead.
-        val canScan = checkSelfPermission(dev.caraalink.ui.NEARBY_PERMISSION) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        if (canScan && dev.caraalink.ui.shouldAutoConnect(dev.caraalink.connection.ConnectionStateHolder.snapshot, AppSettings.wirelessCar(this) != null)) {
-            dev.caraalink.ui.startWireless(this)
+        val snapshot = ConnectionStateHolder.snapshot
+        if (snapshot.phase.isCarConnected()) return
+
+        // If a USB car accessory is physically attached, cable always wins.
+        if (UsbCableConnector.connectIfPermitted(this)) {
+            AppSettings.setConnectionMode(this, AppSettings.ConnectionMode.CABLE)
+            return
+        }
+
+        // Only auto-start wireless search when Wireless mode is selected.
+        if (AppSettings.connectionMode(this) == AppSettings.ConnectionMode.WIRELESS) {
+            val canScan = checkSelfPermission(dev.caraalink.ui.NEARBY_PERMISSION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (canScan && dev.caraalink.ui.shouldAutoConnect(snapshot, AppSettings.wirelessCar(this) != null)) {
+                dev.caraalink.ui.startWireless(this)
+            }
         }
     }
 
@@ -187,5 +215,4 @@ class MainActivity : ComponentActivity() {
         maybeAutoStartOnAttach(intent)
         maybeStartAaTls(intent)
     }
-
 }

@@ -61,6 +61,7 @@ import dev.caraalink.diagnostics.DiagnosticLogger
 import dev.caraalink.service.UsbLinkForegroundService
 import dev.caraalink.settings.AppSettings
 import dev.caraalink.ui.theme.Dash
+import dev.caraalink.usb.UsbCableConnector
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -134,6 +135,20 @@ private fun stopLink(context: Context) {
     context.startService(Intent(context, UsbLinkForegroundService::class.java).setAction(UsbLinkForegroundService.ACTION_STOP))
 }
 
+private fun connectByCable(context: Context, silentIfMissing: Boolean = false) {
+    when (UsbCableConnector.connect(context)) {
+        UsbCableConnector.Result.STARTED -> Unit
+        UsbCableConnector.Result.PERMISSION_REQUESTED -> {
+            Toast.makeText(context, context.getString(R.string.usb_permission_hint), Toast.LENGTH_SHORT).show()
+        }
+        UsbCableConnector.Result.NO_ACCESSORY -> {
+            if (!silentIfMissing) {
+                Toast.makeText(context, context.getString(R.string.usb_not_found_toast), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+}
+
 private fun toggleHeadUnitServer(context: Context, action: AaServerAccessibilityService.Action) {
     val started = AaServerAccessibilityService.requestAction(context, action, returnToApp = true)
     if (!started) {
@@ -151,6 +166,37 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
     val state = homeState(serverRunning, carConnected, connection.wireless)
     val searchName = carToRetry(connection, AppSettings.wirelessCar(context))?.name
     val carName = connection.carName ?: searchName ?: stringResource(R.string.state_connected)
+    var connectionMode by remember { mutableStateOf(AppSettings.connectionMode(context)) }
+    var prevServerRunning by remember { mutableStateOf(serverRunning) }
+
+    // Keep UI switch synced if a physical USB cable connects.
+    LaunchedEffect(connection.link, carConnected) {
+        if (carConnected && connection.link == CarLink.CABLE) {
+            connectionMode = AppSettings.ConnectionMode.CABLE
+            AppSettings.setConnectionMode(context, AppSettings.ConnectionMode.CABLE)
+        } else if (carConnected && connection.link == CarLink.WIRELESS) {
+            connectionMode = AppSettings.ConnectionMode.WIRELESS
+            AppSettings.setConnectionMode(context, AppSettings.ConnectionMode.WIRELESS)
+        }
+    }
+
+    // Auto-start the chosen connection right when the server comes online, so the user
+    // doesn't have to bounce back and forth between Android Auto settings and Geely Link.
+    LaunchedEffect(serverRunning, connectionMode) {
+        val justStarted = serverRunning && !prevServerRunning
+        prevServerRunning = serverRunning
+        if (justStarted && !carConnected) {
+            if (connectionMode == AppSettings.ConnectionMode.CABLE) {
+                connectByCable(context, silentIfMissing = true)
+            } else {
+                val remembered = AppSettings.wirelessCar(context)
+                val canScan = context.checkSelfPermission(NEARBY_PERMISSION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                if (remembered != null && canScan && shouldAutoConnect(connection, true)) {
+                    startWireless(context, remembered.address, remembered.name)
+                }
+            }
+        }
+    }
 
     var idleRemainingMin by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(serverRunning, carConnected) {
@@ -177,7 +223,10 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
             .background(Dash.Background)
             .systemBarsPadding(),
     ) {
-        DashTopBar(onOpenSettings)
+        DashTopBar(
+            onOpenSettings = onOpenSettings,
+            onOpenAndroidAuto = { AndroidAutoServer.openSettings(context) },
+        )
 
         Column(
             Modifier
@@ -186,9 +235,8 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
         ) {
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(22.dp))
 
-            // Subtle status badge: dot + plain sentence-case state
             val statusDot = when (state) {
                 HomeState.CONNECTED -> Dash.Success
                 HomeState.SEARCHING, HomeState.CONNECTING -> Dash.Teal
@@ -225,7 +273,11 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                 HomeState.WIFI_OFF -> stringResource(R.string.home_wifi_off_title)
             }
             val body = when (state) {
-                HomeState.READY -> R.string.home_ready_body
+                HomeState.READY -> if (connectionMode == AppSettings.ConnectionMode.CABLE) {
+                    R.string.home_ready_body_wired
+                } else {
+                    R.string.home_ready_body_wireless
+                }
                 HomeState.NEEDS_TAP -> R.string.home_needs_tap_body
                 HomeState.CONNECTED -> R.string.home_connected_body
                 HomeState.SEARCHING -> R.string.home_searching_body
@@ -246,9 +298,30 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                 )
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
 
-            // Unified 3-row Geely instrument status card with crisp hairline dividers
+            ConnectionModeSwitch(
+                mode = connectionMode,
+                onSelect = { newMode ->
+                    connectionMode = newMode
+                    AppSettings.setConnectionMode(context, newMode)
+                    if (newMode == AppSettings.ConnectionMode.CABLE) {
+                        if (connection.link == CarLink.WIRELESS ||
+                            connection.wireless == WirelessPhase.SEARCHING ||
+                            connection.wireless == WirelessPhase.CONNECTING ||
+                            connection.wireless == WirelessPhase.RECONNECTING
+                        ) {
+                            stopLink(context)
+                        }
+                        if (serverRunning && !carConnected) {
+                            connectByCable(context, silentIfMissing = true)
+                        }
+                    }
+                },
+            )
+
+            Spacer(Modifier.height(14.dp))
+
             val cable = carConnected && connection.link == CarLink.CABLE
             val linkValue = when {
                 !carConnected -> stringResource(R.string.state_not_connected)
@@ -309,7 +382,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
         }
 
         Column(
@@ -319,7 +392,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                 .padding(bottom = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            HomeActions(state, serverRunning, carConnected, connection, onOpenNearby)
+            HomeActions(state, connectionMode, serverRunning, carConnected, connection, onOpenNearby)
             SendLogsLink()
         }
     }
@@ -329,6 +402,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
 @Composable
 private fun HomeActions(
     state: HomeState,
+    connectionMode: AppSettings.ConnectionMode,
     serverRunning: Boolean,
     carConnected: Boolean,
     connection: ConnectionSnapshot,
@@ -337,19 +411,34 @@ private fun HomeActions(
     val context = LocalContext.current
     when (state) {
         HomeState.READY -> {
-            GlowButton(stringResource(R.string.home_connect_wireless), onOpenNearby)
+            if (connectionMode == AppSettings.ConnectionMode.CABLE) {
+                GlowButton(stringResource(R.string.home_connect_wired), { connectByCable(context) })
+            } else {
+                val remembered = AppSettings.wirelessCar(context)
+                if (remembered != null) {
+                    GlowButton(stringResource(R.string.home_connect_wireless), {
+                        startWireless(context, remembered.address, remembered.name)
+                    })
+                } else {
+                    GlowButton(stringResource(R.string.home_connect_wireless), onOpenNearby)
+                }
+            }
             Spacer(Modifier.height(10.dp))
             SecondaryButton(stringResource(R.string.home_stop_server), {
                 toggleHeadUnitServer(context, AaServerAccessibilityService.Action.STOP)
             })
+            if (connectionMode == AppSettings.ConnectionMode.WIRELESS && AppSettings.wirelessCar(context) != null) {
+                Spacer(Modifier.height(4.dp))
+                DashLink(stringResource(R.string.home_choose_car), onOpenNearby)
+            }
         }
         HomeState.SEARCHING, HomeState.CONNECTING -> {
-            SecondaryButton(stringResource(R.string.home_use_another_car), onOpenNearby)
+            SecondaryButton(stringResource(R.string.home_disconnect), { stopLink(context) })
+            Spacer(Modifier.height(4.dp))
+            DashLink(stringResource(R.string.home_use_another_car), onOpenNearby)
         }
         HomeState.CONNECTED -> {
-            if (connection.link == CarLink.WIRELESS) {
-                SecondaryButton(stringResource(R.string.home_disconnect), { stopLink(context) })
-            }
+            SecondaryButton(stringResource(R.string.home_disconnect), { stopLink(context) })
         }
         HomeState.NEEDS_TAP -> {
             AmberButton(
@@ -360,9 +449,13 @@ private fun HomeActions(
             SecondaryButton(stringResource(R.string.open_aa_manual), { AndroidAutoServer.openSettings(context) })
         }
         HomeState.NOT_FOUND -> {
-            GlowButton(stringResource(R.string.home_try_again), { retryWireless(context, connection) })
-            Spacer(Modifier.height(10.dp))
-            SecondaryButton(stringResource(R.string.home_choose_car), onOpenNearby)
+            if (connectionMode == AppSettings.ConnectionMode.CABLE) {
+                GlowButton(stringResource(R.string.home_connect_wired), { connectByCable(context) })
+            } else {
+                GlowButton(stringResource(R.string.home_try_again), { retryWireless(context, connection) })
+                Spacer(Modifier.height(10.dp))
+                SecondaryButton(stringResource(R.string.home_choose_car), onOpenNearby)
+            }
             if (serverRunning && !carConnected) {
                 Spacer(Modifier.height(6.dp))
                 DashLink(stringResource(R.string.home_stop_server)) {
@@ -371,9 +464,13 @@ private fun HomeActions(
             }
         }
         HomeState.WIFI_OFF -> {
-            AmberButton(stringResource(R.string.home_wifi_settings), { context.startActivity(Intent(Settings.Panel.ACTION_WIFI)) })
-            Spacer(Modifier.height(10.dp))
-            SecondaryButton(stringResource(R.string.home_try_again), { retryWireless(context, connection) })
+            if (connectionMode == AppSettings.ConnectionMode.CABLE) {
+                GlowButton(stringResource(R.string.home_connect_wired), { connectByCable(context) })
+            } else {
+                AmberButton(stringResource(R.string.home_wifi_settings), { context.startActivity(Intent(Settings.Panel.ACTION_WIFI)) })
+                Spacer(Modifier.height(10.dp))
+                SecondaryButton(stringResource(R.string.home_try_again), { retryWireless(context, connection) })
+            }
             if (serverRunning && !carConnected) {
                 Spacer(Modifier.height(6.dp))
                 DashLink(stringResource(R.string.home_stop_server)) {

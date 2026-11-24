@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -16,8 +17,8 @@ import dev.caraalink.MainActivity
 
 /**
  * Automates tapping "Start head unit server" / "Stop head unit server" inside
- * Android Auto's settings screen so the user can toggle the server with one
- * button inside AA Bridge and auto-stop it after an idle timeout.
+ * Android Auto's settings screen using both accessibility events and an active
+ * polling loop, with a geometric top-right fallback for the ⋮ overflow button.
  */
 class AaServerAccessibilityService : AccessibilityService() {
 
@@ -26,7 +27,59 @@ class AaServerAccessibilityService : AccessibilityService() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var lastOverflowClickMs = 0L
 
+    private val pollRunnable = object : Runnable {
+        override fun run() {
+            if (pendingAction == null) return
+            if (SystemClock.elapsedRealtime() > pendingDeadlineMs) {
+                Log.w(TAG, "Pending action $pendingAction timed out")
+                clearPending()
+                return
+            }
+            stepAutomation()
+            if (pendingAction != null) {
+                mainHandler.postDelayed(this, POLL_INTERVAL_MS)
+            }
+        }
+    }
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        instance = this
+        Log.i(TAG, "Accessibility service connected")
+        if (pendingAction != null) {
+            schedulePolling()
+        }
+    }
+
+    override fun onUnbind(intent: Intent?): Boolean {
+        if (instance === this) instance = null
+        mainHandler.removeCallbacks(pollRunnable)
+        return super.onUnbind(intent)
+    }
+
+    override fun onDestroy() {
+        if (instance === this) instance = null
+        mainHandler.removeCallbacks(pollRunnable)
+        super.onDestroy()
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (pendingAction == null) return
+        stepAutomation()
+    }
+
+    override fun onInterrupt() {
+        clearPending()
+        mainHandler.removeCallbacks(pollRunnable)
+    }
+
+    internal fun schedulePolling() {
+        lastOverflowClickMs = 0L
+        mainHandler.removeCallbacks(pollRunnable)
+        mainHandler.postDelayed(pollRunnable, 250L)
+    }
+
+    private fun stepAutomation() {
         val action = pendingAction ?: return
         val now = SystemClock.elapsedRealtime()
         if (now > pendingDeadlineMs) {
@@ -38,11 +91,8 @@ class AaServerAccessibilityService : AccessibilityService() {
         val roots = collectRoots()
         if (roots.isEmpty()) return
 
-        val targetLabels = if (action == Action.START) START_LABELS else STOP_LABELS
-        val oppositeLabels = if (action == Action.START) STOP_LABELS else START_LABELS
-
-        // 1. If the desired menu entry is already visible, tap it and finish.
-        findNodeByLabels(roots, targetLabels)?.let { targetNode ->
+        // 1. If the desired menu item is already visible in the popup, tap it and finish.
+        findMenuItem(roots, action)?.let { targetNode ->
             if (clickNodeOrParent(targetNode)) {
                 Log.i(TAG, "Clicked menu item for $action")
                 finishAction(action)
@@ -50,32 +100,35 @@ class AaServerAccessibilityService : AccessibilityService() {
             }
         }
 
-        // 2. If the opposite entry is visible, the server is already in the desired state.
-        if (findNodeByLabels(roots, oppositeLabels) != null) {
+        // 2. If the opposite menu item is visible, the server is already in the desired state.
+        val opposite = if (action == Action.START) Action.STOP else Action.START
+        if (findMenuItem(roots, opposite) != null) {
             Log.i(TAG, "Server already in desired state for $action")
             performGlobalAction(GLOBAL_ACTION_BACK)
             finishAction(action)
             return
         }
 
-        // 3. Otherwise, open the overflow menu (⋮) in Android Auto's toolbar.
+        // 3. Only tap the overflow menu when Android Auto's settings screen is active.
+        val onAaScreen = roots.any { root ->
+            val pkg = root.packageName?.toString() ?: ""
+            pkg == ANDROID_AUTO_PACKAGE
+        }
+        if (!onAaScreen) return
+
         if (now - lastOverflowClickMs >= OVERFLOW_RETRY_MS) {
-            findOverflowNode(roots)?.let { overflow ->
-                if (clickNodeOrParent(overflow)) {
-                    lastOverflowClickMs = now
-                    Log.i(TAG, "Clicked overflow menu button")
-                }
+            val overflow = findOverflowNode(roots) ?: findTopRightOverflowFallback(roots)
+            if (overflow != null && clickNodeOrParent(overflow)) {
+                lastOverflowClickMs = now
+                Log.i(TAG, "Clicked overflow menu button")
             }
         }
-    }
-
-    override fun onInterrupt() {
-        clearPending()
     }
 
     private fun finishAction(action: Action) {
         val returnToApp = pendingReturnToApp
         clearPending()
+        mainHandler.removeCallbacks(pollRunnable)
         if (action == Action.START) {
             ServerIdleTimer.arm(applicationContext)
         } else {
@@ -92,7 +145,6 @@ class AaServerAccessibilityService : AccessibilityService() {
 
     private fun collectRoots(): List<AccessibilityNodeInfo> {
         val result = ArrayList<AccessibilityNodeInfo>()
-        rootInActiveWindow?.let { result.add(it) }
         runCatching {
             windows?.forEach { window ->
                 window.root?.let { root ->
@@ -100,26 +152,38 @@ class AaServerAccessibilityService : AccessibilityService() {
                 }
             }
         }
+        rootInActiveWindow?.let { active ->
+            if (result.none { it == active }) result.add(active)
+        }
         return result
     }
 
-    private fun findNodeByLabels(
-        roots: List<AccessibilityNodeInfo>,
-        labels: List<String>,
-    ): AccessibilityNodeInfo? {
+    private fun findMenuItem(roots: List<AccessibilityNodeInfo>, action: Action): AccessibilityNodeInfo? {
         for (root in roots) {
-            for (label in labels) {
-                val matches = root.findAccessibilityNodeInfosByText(label)
-                if (!matches.isNullOrEmpty()) {
-                    val exact = matches.firstOrNull { node ->
-                        val text = node.text?.toString()?.trim()?.lowercase()
-                        text != null && labels.any { text.contains(it) }
-                    }
-                    if (exact != null) return exact
-                }
-            }
+            val found = findMenuItemRecursive(root, action)
+            if (found != null) return found
         }
         return null
+    }
+
+    private fun findMenuItemRecursive(node: AccessibilityNodeInfo, action: Action): AccessibilityNodeInfo? {
+        val text = node.text?.toString()?.trim()?.lowercase()
+        if (text != null && matchesActionLabel(text, action)) {
+            return node
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findMenuItemRecursive(child, action)
+            if (found != null) return found
+        }
+        return null
+    }
+
+    private fun matchesActionLabel(text: String, action: Action): Boolean = when (action) {
+        Action.START -> (text.contains("запустить") && text.contains("сервер")) ||
+            (text.contains("start") && text.contains("head unit server"))
+        Action.STOP -> (text.contains("остановить") && text.contains("сервер")) ||
+            (text.contains("stop") && text.contains("head unit server"))
     }
 
     private fun findOverflowNode(roots: List<AccessibilityNodeInfo>): AccessibilityNodeInfo? {
@@ -147,10 +211,54 @@ class AaServerAccessibilityService : AccessibilityService() {
         return null
     }
 
+    /**
+     * Fallback for localized / One UI toolbars where ⋮ has no expected contentDescription:
+     * picks the rightmost clickable icon in the top toolbar band.
+     */
+    private fun findTopRightOverflowFallback(roots: List<AccessibilityNodeInfo>): AccessibilityNodeInfo? {
+        val dm = resources.displayMetrics
+        val maxTop = (dm.heightPixels * 0.20f).toInt()
+        val minLeft = (dm.widthPixels * 0.72f).toInt()
+        val maxWidth = (dm.widthPixels * 0.28f).toInt()
+        var best: AccessibilityNodeInfo? = null
+        var bestRight = -1
+
+        fun scan(node: AccessibilityNodeInfo) {
+            val rect = Rect()
+            node.getBoundsInScreen(rect)
+            val cls = node.className?.toString() ?: ""
+            val looksLikeIcon = cls.contains("Image", ignoreCase = true) ||
+                cls.contains("Button", ignoreCase = true) ||
+                cls.contains("ActionMenu", ignoreCase = true)
+            if (node.isClickable && looksLikeIcon &&
+                rect.top in 0..maxTop &&
+                rect.left >= minLeft &&
+                rect.width() in 1..maxWidth &&
+                rect.height() in 1..maxTop
+            ) {
+                if (rect.right > bestRight) {
+                    bestRight = rect.right
+                    best = node
+                }
+            }
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i) ?: continue
+                scan(child)
+            }
+        }
+
+        for (root in roots) {
+            if (root.packageName?.toString() == ANDROID_AUTO_PACKAGE) {
+                scan(root)
+            }
+        }
+        return best
+    }
+
     private fun clickNodeOrParent(node: AccessibilityNodeInfo): Boolean {
         var current: AccessibilityNodeInfo? = node
         var depth = 0
-        while (current != null && depth < 5) {
+        while (current != null && depth < 6) {
             if (current.isClickable) {
                 return current.performAction(AccessibilityNodeInfo.ACTION_CLICK)
             }
@@ -162,27 +270,23 @@ class AaServerAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val TAG = "AaServerA11y"
+        private const val ANDROID_AUTO_PACKAGE = "com.google.android.projection.gearhead"
         private const val ACTION_TIMEOUT_MS = 12_000L
-        private const val OVERFLOW_RETRY_MS = 900L
-        private const val RETURN_DELAY_MS = 350L
+        private const val POLL_INTERVAL_MS = 300L
+        private const val OVERFLOW_RETRY_MS = 850L
+        private const val RETURN_DELAY_MS = 400L
 
-        private val START_LABELS = listOf(
-            "запустить сервер головного устройства",
-            "start head unit server",
-        )
-        private val STOP_LABELS = listOf(
-            "остановить сервер головного устройства",
-            "stop head unit server",
-        )
         private val OVERFLOW_DESCRIPTIONS = listOf(
             "другие параметры",
             "дополнительные параметры",
+            "дополнительные функции",
             "ещё",
             "еще",
             "more options",
             "overflow",
         )
 
+        @Volatile private var instance: AaServerAccessibilityService? = null
         @Volatile private var pendingAction: Action? = null
         @Volatile private var pendingReturnToApp: Boolean = true
         @Volatile private var pendingDeadlineMs: Long = 0L
@@ -194,6 +298,7 @@ class AaServerAccessibilityService : AccessibilityService() {
         }
 
         fun isServiceEnabled(context: Context): Boolean {
+            if (instance != null) return true
             val expected = ComponentName(context, AaServerAccessibilityService::class.java)
             val enabled = Settings.Secure.getString(
                 context.contentResolver,
@@ -227,6 +332,7 @@ class AaServerAccessibilityService : AccessibilityService() {
             pendingAction = action
             pendingReturnToApp = returnToApp
             pendingDeadlineMs = SystemClock.elapsedRealtime() + ACTION_TIMEOUT_MS
+            instance?.schedulePolling()
             val opened = AndroidAutoServer.openSettings(context)
             if (!opened) clearPending()
             return opened

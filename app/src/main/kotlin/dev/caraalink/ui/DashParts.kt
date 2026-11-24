@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.caraalink.R
+import dev.caraalink.settings.AppSettings
 import dev.caraalink.ui.theme.Dash
 
 enum class RingMode { IDLE, SPIN, FULL, ALERT }
@@ -51,6 +52,51 @@ fun GeelyEmblemMark(modifier: Modifier = Modifier) {
         contentDescription = null,
         modifier = modifier.size(width = 44.dp, height = 13.dp),
     )
+}
+
+/** Minimal 2-segment graphite-silver switch for Wired (USB) vs Wireless (Wi-Fi). */
+@Composable
+fun ConnectionModeSwitch(
+    mode: AppSettings.ConnectionMode,
+    onSelect: (AppSettings.ConnectionMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val outerShape = RoundedCornerShape(12.dp)
+    val itemShape = RoundedCornerShape(9.dp)
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(outerShape)
+            .background(Dash.Tile)
+            .border(1.dp, Dash.TileBorder, outerShape)
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        val items = listOf(
+            AppSettings.ConnectionMode.CABLE to stringResource(R.string.mode_wired),
+            AppSettings.ConnectionMode.WIRELESS to stringResource(R.string.mode_wireless),
+        )
+        items.forEach { (value, label) ->
+            val selected = mode == value
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(38.dp)
+                    .clip(itemShape)
+                    .background(if (selected) Dash.Teal else Color.Transparent)
+                    .clickable { if (!selected) onSelect(value) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    color = if (selected) Color(0xFF0E1014) else Dash.Muted,
+                    fontSize = 13.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
 }
 
 /** Kept for API compatibility; flat minimal indicator without neon glow. */
@@ -127,7 +173,7 @@ fun Telltale(icon: Painter, label: String, lamp: Lamp) {
     }
 }
 
-/** Primary action: solid flat Geely cobalt blue button. */
+/** Primary action: solid flat silver-titanium button with deep obsidian text. */
 @Composable
 fun GlowButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
@@ -143,7 +189,7 @@ fun GlowButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier)
     }
 }
 
-/** Attention action: solid flat restrained amber button. */
+/** Attention action: unified flat silver-titanium button. */
 @Composable
 fun AmberButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
@@ -202,9 +248,12 @@ fun Byline(modifier: Modifier = Modifier) {
     )
 }
 
-/** Clean top bar with geometric Geely emblem, sentence-case title, and settings icon. */
+/** Clean top bar with Geely shield, title, quick Android Auto settings icon, and app settings icon. */
 @Composable
-fun DashTopBar(onOpenSettings: () -> Unit) {
+fun DashTopBar(
+    onOpenSettings: () -> Unit,
+    onOpenAndroidAuto: (() -> Unit)? = null,
+) {
     Column(Modifier.fillMaxWidth()) {
         Row(
             Modifier
@@ -224,8 +273,20 @@ fun DashTopBar(onOpenSettings: () -> Unit) {
                     letterSpacing = (-0.2).sp,
                 )
             }
-            IconButton(onClick = onOpenSettings) {
-                Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.settings), tint = Dash.Muted)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (onOpenAndroidAuto != null) {
+                    IconButton(onClick = onOpenAndroidAuto) {
+                        Icon(
+                            painterResource(R.drawable.ic_android_auto),
+                            contentDescription = stringResource(R.string.open_aa),
+                            tint = Dash.Muted,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+                IconButton(onClick = onOpenSettings) {
+                    Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.settings), tint = Dash.Muted)
+                }
             }
         }
         HorizontalDivider(thickness = 1.dp, color = Dash.TileBorder)

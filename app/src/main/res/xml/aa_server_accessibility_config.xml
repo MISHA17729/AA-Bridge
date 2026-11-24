@@ -5,5 +5,4 @@
     android:accessibilityFlags="flagDefault|flagIncludeNotImportantViews|flagRetrieveInteractiveWindows"
     android:canRetrieveWindowContent="true"
     android:description="@string/a11y_server_description"
-    android:notificationTimeout="100"
-    android:packageNames="com.google.android.projection.gearhead" />
+    android:notificationTimeout="80" />

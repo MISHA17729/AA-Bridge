@@ -17,6 +17,7 @@ object AppSettings {
     enum class AaAudioRoute { BT_PREFERRED, DEVICE_ONLY, PHONE_DIRECT }
     enum class CarOrientation { AUTO, LANDSCAPE, PORTRAIT }
     enum class AaFillMode { FIT, FILL }
+    enum class ConnectionMode { CABLE, WIRELESS }
 
     private fun prefs(context: Context) =
         PreferenceManager.getDefaultSharedPreferences(context)
@@ -173,4 +174,17 @@ object AppSettings {
 
     fun updateAutoCheck(context: Context): Boolean =
         prefs(context).getBoolean("update_auto_check", true)
+
+    fun connectionMode(context: Context): ConnectionMode =
+        when (prefs(context).getString("connection_mode", null)) {
+            "cable" -> ConnectionMode.CABLE
+            "wireless" -> ConnectionMode.WIRELESS
+            else -> if (wirelessCar(context) != null) ConnectionMode.WIRELESS else ConnectionMode.CABLE
+        }
+
+    fun setConnectionMode(context: Context, mode: ConnectionMode) =
+        prefs(context).edit().putString(
+            "connection_mode",
+            if (mode == ConnectionMode.CABLE) "cable" else "wireless",
+        ).apply()
 }

@@ -112,5 +112,13 @@
     <string name="a11y_enable_toast">Enable Geely Link in Accessibility settings for one-tap server control</string>
     <string name="notif_idle_stop_title">Android Auto server is still running</string>
     <string name="notif_idle_stop_text">No car connected for 1 hour. Unlock or tap to stop the server.</string>
+    <string name="mode_wired">Wired (USB)</string>
+    <string name="mode_wireless">Wireless (Wi-Fi)</string>
+    <string name="home_ready_body_wired">Connect the USB cable and open Phone Link on your car screen.</string>
+    <string name="home_ready_body_wireless">Open Phone Link on your car screen and tap Connect.</string>
+    <string name="home_connect_wired">Connect via USB</string>
+    <string name="usb_permission_hint">Allow USB access on the pop-up dialog</string>
+    <string name="usb_not_found_toast">Car not detected on USB. Check the cable and open Phone Link on the car screen.</string>
 </resources>
+
 

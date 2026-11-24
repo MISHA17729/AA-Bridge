@@ -107,5 +107,13 @@
     <string name="a11y_enable_toast">Включите Geely Link в «Специальных возможностях» для управления сервером одной кнопкой</string>
     <string name="notif_idle_stop_title">Сервер Android Auto всё ещё запущен</string>
     <string name="notif_idle_stop_text">Машина не подключалась 1 час. Разблокируйте экран или нажмите, чтобы остановить сервер.</string>
+    <string name="mode_wired">Проводной (USB)</string>
+    <string name="mode_wireless">Беспроводной (Wi-Fi)</string>
+    <string name="home_ready_body_wired">Подключите USB-кабель и откройте раздел подключения телефона на экране авто.</string>
+    <string name="home_ready_body_wireless">Откройте раздел подключения телефона на экране авто и нажмите «Подключиться».</string>
+    <string name="home_connect_wired">Подключиться по USB</string>
+    <string name="usb_permission_hint">Подтвердите доступ к USB во всплывающем окне</string>
+    <string name="usb_not_found_toast">Автомобиль по USB не обнаружен. Проверьте кабель и откройте экран подключения в авто.</string>
 </resources>
+
 
