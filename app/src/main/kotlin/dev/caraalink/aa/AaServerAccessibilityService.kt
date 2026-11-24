@@ -171,6 +171,10 @@ class AaServerAccessibilityService : AccessibilityService() {
         if (text != null && matchesActionLabel(text, action)) {
             return node
         }
+        val desc = node.contentDescription?.toString()?.trim()?.lowercase()
+        if (desc != null && matchesActionLabel(desc, action)) {
+            return node
+        }
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
             val found = findMenuItemRecursive(child, action)
@@ -180,10 +184,15 @@ class AaServerAccessibilityService : AccessibilityService() {
     }
 
     private fun matchesActionLabel(text: String, action: Action): Boolean = when (action) {
-        Action.START -> (text.contains("запустить") && text.contains("сервер")) ||
-            (text.contains("start") && text.contains("head unit server"))
-        Action.STOP -> (text.contains("остановить") && text.contains("сервер")) ||
-            (text.contains("stop") && text.contains("head unit server"))
+        Action.START -> text == "вкл. сервер головного устр-ва" || (
+            !text.contains("выкл") &&
+                (text.contains("вкл") || text.contains("запуск") || text.contains("запусти") || text.contains("старт")) &&
+                text.contains("сервер")
+            ) || (text.contains("start") && text.contains("head unit server"))
+        Action.STOP -> (
+            (text.contains("останов") || text.contains("выкл") || text.contains("откл") || text.contains("стоп")) &&
+                text.contains("сервер")
+            ) || (text.contains("stop") && text.contains("head unit server"))
     }
 
     private fun findOverflowNode(roots: List<AccessibilityNodeInfo>): AccessibilityNodeInfo? {
