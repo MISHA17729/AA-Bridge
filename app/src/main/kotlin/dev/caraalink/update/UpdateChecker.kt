@@ -40,8 +40,7 @@ object UpdateChecker {
 
     /** Called from MainActivity.onCreate() -- silent unless something newer actually exists. */
     fun checkIfDue(context: Context) {
-        if (!AppSettings.updateAutoCheck(context)) return
-        checkNow(context, manual = false)
+        // Custom Geely Link build: do not prompt to overwrite with upstream AA-Bridge releases.
     }
 
     /** [manual] controls whether a "you're up to date" / error Toast shows; a found update always prompts. */

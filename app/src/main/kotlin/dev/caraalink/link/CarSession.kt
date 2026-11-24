@@ -422,7 +422,7 @@ class CarSession(
         val mirrorRequested = dev.caraalink.settings.AppSettings.displayMode(context) ==
             dev.caraalink.settings.AppSettings.DisplayMode.MIRROR &&
             dev.caraalink.video.PhoneMirrorController.hasPermission()
-        if (mirrorRequested && dev.caraalink.video.PhoneMirrorController.start(context, enc.inputSurface, config.encodeWidth, config.encodeHeight)) {
+        if (mirrorRequested && dev.caraalink.video.PhoneMirrorController.startOrUpdate(context, enc.inputSurface, config.encodeWidth, config.encodeHeight)) {
             logger.log("Phone screen mirror attached to encoder ${config.encodeWidth}x${config.encodeHeight}")
             return
         }
@@ -458,6 +458,13 @@ class CarSession(
 
     override fun onKey(key: Int) {
         logger.log("car key $key")
+        if (dev.caraalink.video.PhoneMirrorController.isActive) {
+            when (key) {
+                MirrorControlChannel.KEY_BACK -> dev.caraalink.aa.AaServerAccessibilityService.performSystemBack()
+                MirrorControlChannel.KEY_HOME -> dev.caraalink.aa.AaServerAccessibilityService.performSystemHome()
+            }
+            return
+        }
         if (key == MirrorControlChannel.KEY_HOME || key == MirrorControlChannel.KEY_BACK) closeAa()
     }
 

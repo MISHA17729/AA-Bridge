@@ -35,7 +35,7 @@ object AndroidAutoServer {
         context.packageManager.getLaunchIntentForPackage(ANDROID_AUTO_PACKAGE),
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$ANDROID_AUTO_PACKAGE")),
     ).firstOrNull { it.resolveActivity(context.packageManager) != null }
-        ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
     fun openSettings(context: Context): Boolean {
         val intent = settingsIntent(context) ?: return false

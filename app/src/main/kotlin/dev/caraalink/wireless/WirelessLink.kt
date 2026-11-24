@@ -138,12 +138,23 @@ class WirelessLink(
             groupFormed = true
             logger.log("group formed: phoneIsOwner=${info.isGroupOwner} owner=${info.groupOwnerAddress?.hostAddress}")
             val owner = info.groupOwnerAddress?.hostAddress
-            if (!info.isGroupOwner && owner != null) listener.onCarReachable(owner, p2pAddress()) else findCarByMdns()
+            if (!info.isGroupOwner && owner != null) notifyReachableWhenP2pReady(owner) else findCarByMdns()
         } else if (groupFormed) {
             groupFormed = false
             stopNsd()
             logger.log("group lost")
             listener.onGroupLost()
+        }
+    }
+
+
+    private fun notifyReachableWhenP2pReady(host: String, attempt: Int = 0) {
+        if (closed || !groupFormed) return
+        val local = p2pAddress()
+        if (local != null || attempt >= 8) {
+            listener.onCarReachable(host, local)
+        } else {
+            main.postDelayed({ notifyReachableWhenP2pReady(host, attempt + 1) }, 250L)
         }
     }
 

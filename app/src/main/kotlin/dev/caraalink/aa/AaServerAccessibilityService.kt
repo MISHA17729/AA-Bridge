@@ -1,6 +1,7 @@
 package dev.caraalink.aa
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
 import android.view.MotionEvent
@@ -31,8 +32,11 @@ class AaServerAccessibilityService : AccessibilityService() {
     private var lastOverflowClickMs = 0L
     private var touchPath: Path? = null
     private var touchDownAtMs = 0L
+    private var touchDownX = 0f
+    private var touchDownY = 0f
     private var touchLastX = 0f
     private var touchLastY = 0f
+    private var touchMoved = false
 
     private val pollRunnable = object : Runnable {
         override fun run() {
@@ -82,29 +86,45 @@ class AaServerAccessibilityService : AccessibilityService() {
                 MotionEvent.ACTION_DOWN -> {
                     touchPath = Path().apply { moveTo(x, y) }
                     touchDownAtMs = SystemClock.uptimeMillis()
+                    touchDownX = x
+                    touchDownY = y
                     touchLastX = x
                     touchLastY = y
+                    touchMoved = false
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val path = touchPath ?: return@post
-                    if (kotlin.math.abs(x - touchLastX) > 2f || kotlin.math.abs(y - touchLastY) > 2f) {
+                    if (kotlin.math.abs(x - touchLastX) >= 4f || kotlin.math.abs(y - touchLastY) >= 4f) {
                         path.lineTo(x, y)
                         touchLastX = x
                         touchLastY = y
+                        if (kotlin.math.abs(x - touchDownX) >= 8f || kotlin.math.abs(y - touchDownY) >= 8f) {
+                            touchMoved = true
+                        }
                     }
                 }
                 MotionEvent.ACTION_UP -> {
                     val path = touchPath ?: return@post
                     touchPath = null
-                    path.lineTo(x, y)
-                    val duration = (SystemClock.uptimeMillis() - touchDownAtMs).coerceIn(35L, 600L)
+                    val finalPath = if (touchMoved) {
+                        if (kotlin.math.abs(x - touchLastX) >= 1f || kotlin.math.abs(y - touchLastY) >= 1f) {
+                            path.lineTo(x, y)
+                        }
+                        path
+                    } else {
+                        Path().apply { moveTo(touchDownX, touchDownY) }
+                    }
+                    val elapsed = SystemClock.uptimeMillis() - touchDownAtMs
+                    val duration = if (touchMoved) elapsed.coerceIn(60L, 500L) else elapsed.coerceIn(40L, 250L)
                     val gesture = GestureDescription.Builder()
-                        .addStroke(GestureDescription.StrokeDescription(path, 0L, duration))
+                        .addStroke(GestureDescription.StrokeDescription(finalPath, 0L, duration))
                         .build()
-                    runCatching { dispatchGesture(gesture, null, null) }
+                    val ok = runCatching { dispatchGesture(gesture, null, null) }.getOrDefault(false)
+                    if (!ok) Log.w(TAG, "dispatchGesture returned false (moved=$touchMoved at $x,$y)")
                 }
                 MotionEvent.ACTION_CANCEL -> {
                     touchPath = null
+                    touchMoved = false
                 }
             }
         }
@@ -118,7 +138,7 @@ class AaServerAccessibilityService : AccessibilityService() {
     internal fun schedulePolling() {
         lastOverflowClickMs = 0L
         mainHandler.removeCallbacks(pollRunnable)
-        mainHandler.postDelayed(pollRunnable, 250L)
+        mainHandler.postDelayed(pollRunnable, 450L)
     }
 
     private fun stepAutomation() {
@@ -323,9 +343,9 @@ class AaServerAccessibilityService : AccessibilityService() {
         private const val TAG = "AaServerA11y"
         private const val ANDROID_AUTO_PACKAGE = "com.google.android.projection.gearhead"
         private const val ACTION_TIMEOUT_MS = 12_000L
-        private const val POLL_INTERVAL_MS = 300L
-        private const val OVERFLOW_RETRY_MS = 850L
-        private const val RETURN_DELAY_MS = 400L
+        private const val POLL_INTERVAL_MS = 350L
+        private const val OVERFLOW_RETRY_MS = 2_000L
+        private const val RETURN_DELAY_MS = 700L
 
         private val OVERFLOW_DESCRIPTIONS = listOf(
             "другие параметры",
@@ -341,6 +361,8 @@ class AaServerAccessibilityService : AccessibilityService() {
         @Volatile private var pendingAction: Action? = null
         @Volatile private var pendingReturnToApp: Boolean = true
         @Volatile private var pendingDeadlineMs: Long = 0L
+
+        fun isBusy(): Boolean = pendingAction != null && SystemClock.elapsedRealtime() <= pendingDeadlineMs
 
         private fun clearPending() {
             pendingAction = null
@@ -387,6 +409,22 @@ class AaServerAccessibilityService : AccessibilityService() {
             val opened = AndroidAutoServer.openSettings(context)
             if (!opened) clearPending()
             return opened
+        }
+
+
+        fun canDispatchGestures(context: Context): Boolean {
+            val svc = instance ?: return false
+            val caps = svc.serviceInfo?.capabilities ?: 0
+            return (caps and AccessibilityServiceInfo.CAPABILITY_CAN_PERFORM_GESTURES) != 0
+        }
+
+
+        fun performSystemBack() {
+            instance?.let { svc -> svc.mainHandler.post { svc.performGlobalAction(GLOBAL_ACTION_BACK) } }
+        }
+
+        fun performSystemHome() {
+            instance?.let { svc -> svc.mainHandler.post { svc.performGlobalAction(GLOBAL_ACTION_HOME) } }
         }
 
         /** Dispatches a car screen touch/swipe onto the phone screen during Screen Mirror mode. */

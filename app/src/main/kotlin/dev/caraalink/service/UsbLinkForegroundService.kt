@@ -256,6 +256,7 @@ class UsbLinkForegroundService : Service() {
 
     override fun onDestroy() {
         closeWireless(disconnect = true)
+        dev.caraalink.video.PhoneMirrorController.stop()
         session?.stop()
         session = null
         ConnectionStateHolder.removeListener(stateListener)
@@ -329,9 +330,17 @@ class UsbLinkForegroundService : Service() {
     private fun beginWireless(target: RememberedCar?) {
         // startForegroundService needs startForeground even when there turns out to be nothing to do.
         startForegroundWithMic(wireless = true)
-        if (target == null || ConnectionStateHolder.snapshot.link == CarLink.CABLE) {
+        val snap = ConnectionStateHolder.snapshot
+        if (target == null || snap.link == CarLink.CABLE) {
             wirelessLog.log("start wireless ignored: ${if (target == null) "no car" else "cable session active"}")
             if (session == null) stopSelfCleanly()
+            return
+        }
+        // Idempotent guard: never tear down an active search/connect to the same car.
+        if (wirelessLink != null && wirelessTarget?.address.equals(target.address, ignoreCase = true) &&
+            (snap.wireless == WirelessPhase.SEARCHING || snap.wireless == WirelessPhase.CONNECTING || snap.phase == ConnectionPhase.STREAMING)
+        ) {
+            wirelessLog.log("start wireless ignored: already active for ${target.address}")
             return
         }
         wirelessLog.log("start wireless: looking for '${target.name}' ${target.address}")
@@ -417,6 +426,7 @@ class UsbLinkForegroundService : Service() {
         Thread({
             val before = SocketTransport.accepted
             for ((label, pkg) in listOf("own" to packageName, "carbitlink" to CarHello.CARBITLINK_PACKAGE)) {
+                if (stopping) return@Thread
                 val answered = CarHello.send(host, local, pkg)
                 val until = android.os.SystemClock.elapsedRealtime() + HELLO_WAIT_MS
                 while (SocketTransport.accepted == before && android.os.SystemClock.elapsedRealtime() < until) Thread.sleep(100)

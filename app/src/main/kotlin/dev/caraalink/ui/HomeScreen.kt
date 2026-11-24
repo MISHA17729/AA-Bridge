@@ -174,7 +174,6 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
     val searchName = carToRetry(connection, AppSettings.wirelessCar(context))?.name
     val carName = connection.carName ?: searchName ?: stringResource(R.string.state_connected)
     var connectionMode by remember { mutableStateOf(AppSettings.connectionMode(context)) }
-    var prevServerRunning by remember { mutableStateOf(serverRunning) }
     var pendingMirrorAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     val mirrorPermissionLauncher = rememberLauncherForActivityResult(
@@ -216,22 +215,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
         }
     }
 
-    // Auto-start the chosen connection right when the server comes online in Android Auto mode.
-    LaunchedEffect(serverRunning, connectionMode, mirrorMode) {
-        val justStarted = serverRunning && !prevServerRunning
-        prevServerRunning = serverRunning
-        if (!mirrorMode && justStarted && !carConnected) {
-            if (connectionMode == AppSettings.ConnectionMode.CABLE) {
-                connectByCable(context, silentIfMissing = true)
-            } else {
-                val remembered = AppSettings.wirelessCar(context)
-                val canScan = context.checkSelfPermission(NEARBY_PERMISSION) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                if (remembered != null && canScan && shouldAutoConnect(connection, true)) {
-                    startWireless(context, remembered.address, remembered.name)
-                }
-            }
-        }
-    }
+
 
     var idleRemainingMin by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(serverRunning, carConnected) {
@@ -354,6 +338,9 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                     connectionMode = newMode
                     AppSettings.setConnectionMode(context, newMode)
                     if (newMode == AppSettings.ConnectionMode.CABLE) {
+                        if (!carConnected) {
+                            ConnectionStateHolder.update { it.copy(wireless = WirelessPhase.IDLE, suggestion = null) }
+                        }
                         if (connection.link == CarLink.WIRELESS ||
                             connection.wireless == WirelessPhase.SEARCHING ||
                             connection.wireless == WirelessPhase.CONNECTING ||
@@ -394,11 +381,16 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                     .border(1.dp, Dash.TileBorder, panelShape),
             ) {
                 if (mirrorMode) {
-                    val touchReady = AaServerAccessibilityService.isServiceEnabled(context)
+                    val touchReady = AaServerAccessibilityService.canDispatchGestures(context)
                     InstrumentRow(
                         label = stringResource(R.string.row_mirror_touch),
                         value = stringResource(if (touchReady) R.string.state_ready else R.string.state_off),
                         lamp = if (touchReady) Lamp.ON else Lamp.ALERT,
+                        modifier = if (!touchReady) {
+                            Modifier.clickable { AaServerAccessibilityService.openAccessibilitySettings(context) }
+                        } else {
+                            Modifier
+                        },
                     )
                 } else {
                     InstrumentRow(
