@@ -1,16 +1,21 @@
 package dev.caraalink.ui
 
 import dev.caraalink.connection.CarLink
+import dev.caraalink.connection.ConnectionPhase
 import dev.caraalink.connection.ConnectionSnapshot
 import dev.caraalink.connection.WirelessPhase
 import dev.caraalink.wireless.RememberedCar
-import dev.caraalink.connection.ConnectionPhase
 
 enum class HomeState { READY, NEEDS_TAP, CONNECTED, SEARCHING, CONNECTING, NOT_FOUND, WIFI_OFF }
 
-/** The server comes first: without it nothing works, car or not. */
-fun homeState(serverRunning: Boolean, carConnected: Boolean, wireless: WirelessPhase = WirelessPhase.IDLE): HomeState = when {
-    !serverRunning -> HomeState.NEEDS_TAP
+/** In Android Auto mode the server comes first; in Mirror mode the server isn't needed. */
+fun homeState(
+    serverRunning: Boolean,
+    carConnected: Boolean,
+    wireless: WirelessPhase = WirelessPhase.IDLE,
+    mirrorMode: Boolean = false,
+): HomeState = when {
+    !mirrorMode && !serverRunning -> HomeState.NEEDS_TAP
     carConnected -> HomeState.CONNECTED
     wireless == WirelessPhase.SEARCHING || wireless == WirelessPhase.RECONNECTING -> HomeState.SEARCHING
     wireless == WirelessPhase.CONNECTING -> HomeState.CONNECTING

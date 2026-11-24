@@ -1,6 +1,9 @@
 package dev.caraalink.aa
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
+import android.graphics.Path
+import android.view.MotionEvent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -26,6 +29,10 @@ class AaServerAccessibilityService : AccessibilityService() {
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var lastOverflowClickMs = 0L
+    private var touchPath: Path? = null
+    private var touchDownAtMs = 0L
+    private var touchLastX = 0f
+    private var touchLastY = 0f
 
     private val pollRunnable = object : Runnable {
         override fun run() {
@@ -66,6 +73,41 @@ class AaServerAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (pendingAction == null) return
         stepAutomation()
+    }
+
+
+    internal fun handleCarTouch(action: Int, x: Float, y: Float) {
+        mainHandler.post {
+            when (action) {
+                MotionEvent.ACTION_DOWN -> {
+                    touchPath = Path().apply { moveTo(x, y) }
+                    touchDownAtMs = SystemClock.uptimeMillis()
+                    touchLastX = x
+                    touchLastY = y
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val path = touchPath ?: return@post
+                    if (kotlin.math.abs(x - touchLastX) > 2f || kotlin.math.abs(y - touchLastY) > 2f) {
+                        path.lineTo(x, y)
+                        touchLastX = x
+                        touchLastY = y
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    val path = touchPath ?: return@post
+                    touchPath = null
+                    path.lineTo(x, y)
+                    val duration = (SystemClock.uptimeMillis() - touchDownAtMs).coerceIn(35L, 600L)
+                    val gesture = GestureDescription.Builder()
+                        .addStroke(GestureDescription.StrokeDescription(path, 0L, duration))
+                        .build()
+                    runCatching { dispatchGesture(gesture, null, null) }
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    touchPath = null
+                }
+            }
+        }
     }
 
     override fun onInterrupt() {
@@ -345,6 +387,11 @@ class AaServerAccessibilityService : AccessibilityService() {
             val opened = AndroidAutoServer.openSettings(context)
             if (!opened) clearPending()
             return opened
+        }
+
+        /** Dispatches a car screen touch/swipe onto the phone screen during Screen Mirror mode. */
+        fun dispatchTouch(action: Int, phoneX: Float, phoneY: Float) {
+            instance?.handleCarTouch(action, phoneX, phoneY)
         }
     }
 }

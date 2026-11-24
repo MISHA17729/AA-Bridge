@@ -122,6 +122,7 @@ class CarSession(
         android.os.Handler(android.os.Looper.getMainLooper()).post { features.stop() }
         encoder?.release()
         encoder = null
+        dev.caraalink.video.PhoneMirrorController.stop()
         display.release()
         synchronized(frameLock) { dataStream = null; pullQueue.clear() }
     }
@@ -418,6 +419,13 @@ class CarSession(
             pullQueue.clear()
         }
         encoder = enc
+        val mirrorRequested = dev.caraalink.settings.AppSettings.displayMode(context) ==
+            dev.caraalink.settings.AppSettings.DisplayMode.MIRROR &&
+            dev.caraalink.video.PhoneMirrorController.hasPermission()
+        if (mirrorRequested && dev.caraalink.video.PhoneMirrorController.start(context, enc.inputSurface, config.encodeWidth, config.encodeHeight)) {
+            logger.log("Phone screen mirror attached to encoder ${config.encodeWidth}x${config.encodeHeight}")
+            return
+        }
         display.attach(enc.inputSurface, config.encodeWidth, config.encodeHeight)
         // First point the car display exists; once per session, since every CONFIG_CAPTURE lands here.
         if (!autoLaunchedAa) {
@@ -435,6 +443,12 @@ class CarSession(
 
     override fun onTouch(action: Int, x: Int, y: Int) {
         val c = config ?: return
+        if (dev.caraalink.video.PhoneMirrorController.isActive) {
+            val mapped = dev.caraalink.video.PhoneMirrorController.mapCarTouchToPhone(context, x, y, c.width, c.height)
+                ?: return
+            dev.caraalink.aa.AaServerAccessibilityService.dispatchTouch(action, mapped.first, mapped.second)
+            return
+        }
         val enc = encoder ?: return
         // Car coordinates are in its own screen size; the encoder may be a few pixels smaller.
         val fx = x * enc.width.toFloat() / c.width

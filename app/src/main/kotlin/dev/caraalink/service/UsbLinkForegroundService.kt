@@ -298,15 +298,23 @@ class UsbLinkForegroundService : Service() {
         val micGranted = checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
         // Wi-Fi Direct scans count as location access up to Android 12, so a reconnect mid-drive needs this type.
         val location = if (wireless && needsLocationForWifiDirect() && hasFineLocation()) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
-        // The microphone type only exists from Android 11; on 10 it's an undeclared type and throws.
-        if (micGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            try {
-                startForeground(NOTIFICATION_ID, notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or location)
-                return
-            } catch (e: SecurityException) {
-                Log.w(TAG, "startForeground with microphone refused -- retrying connectedDevice only", e)
-            }
+        val mirror = if (AppSettings.displayMode(this) == AppSettings.DisplayMode.MIRROR &&
+            dev.caraalink.video.PhoneMirrorController.hasPermission()
+        ) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION else 0
+        val mic = if (micGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
+        val desired = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or mic or location or mirror
+        try {
+            startForeground(NOTIFICATION_ID, notification, desired)
+            return
+        } catch (e: SecurityException) {
+            Log.w(TAG, "startForeground($desired) refused -- retrying without mic/mirror", e)
+        }
+        val fallback = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or location or mirror
+        try {
+            startForeground(NOTIFICATION_ID, notification, fallback)
+            return
+        } catch (e: SecurityException) {
+            Log.w(TAG, "startForeground($fallback) refused -- retrying connectedDevice only", e)
         }
         startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or location)
     }

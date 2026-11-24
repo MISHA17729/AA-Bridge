@@ -18,6 +18,7 @@ object AppSettings {
     enum class CarOrientation { AUTO, LANDSCAPE, PORTRAIT }
     enum class AaFillMode { FIT, FILL }
     enum class ConnectionMode { CABLE, WIRELESS }
+    enum class DisplayMode { ANDROID_AUTO, MIRROR }
 
     private fun prefs(context: Context) =
         PreferenceManager.getDefaultSharedPreferences(context)
@@ -190,4 +191,16 @@ object AppSettings {
 
     fun serverIdleTimeoutMinutes(context: Context): Long =
         prefs(context).getString("server_idle_timeout_min", "15")?.toLongOrNull()?.coerceIn(5L, 120L) ?: 15L
+
+    fun displayMode(context: Context): DisplayMode =
+        when (prefs(context).getString("display_mode", "android_auto")) {
+            "mirror" -> DisplayMode.MIRROR
+            else -> DisplayMode.ANDROID_AUTO
+        }
+
+    fun setDisplayMode(context: Context, mode: DisplayMode) =
+        prefs(context).edit().putString(
+            "display_mode",
+            if (mode == DisplayMode.MIRROR) "mirror" else "android_auto",
+        ).apply()
 }

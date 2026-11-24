@@ -163,7 +163,18 @@
     <string name="pref_crash_log_summary">Автоматически сохранять лог в «Загрузки» при вылете приложения</string>
     <string name="pref_dev_tools_title">Инструменты разработчика</string>
     <string name="pref_dev_tools_summary">Экспорт логов и предпросмотр экрана авто</string>
+    <string name="display_mode_aa">Android Auto</string>
+    <string name="display_mode_mirror">Зеркало экрана</string>
+    <string name="home_mirror_ready_title">Зеркало экрана готово</string>
+    <string name="home_mirror_ready_body">Дублирует экран телефона с управлением с сенсора авто. Сервер Android Auto не нужен.</string>
+    <string name="home_mirror_connected_body">Экран телефона транслируется на дисплей автомобиля.</string>
+    <string name="home_start_mirror_wired">Запустить зеркало по USB</string>
+    <string name="home_start_mirror_wireless">Запустить зеркало по Wi-Fi</string>
+    <string name="row_mirror_touch">Управление с сенсора</string>
+    <string name="state_ready">Готово</string>
+    <string name="mirror_permission_denied">Для режима зеркала нужно разрешить трансляцию экрана</string>
 </resources>
+
 
 
 

@@ -54,6 +54,52 @@ fun GeelyEmblemMark(modifier: Modifier = Modifier) {
     )
 }
 
+
+/** Minimal 2-segment graphite-silver switch for Android Auto vs Phone Screen Mirror. */
+@Composable
+fun DisplayModeSwitch(
+    mode: AppSettings.DisplayMode,
+    onSelect: (AppSettings.DisplayMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val outerShape = RoundedCornerShape(12.dp)
+    val itemShape = RoundedCornerShape(9.dp)
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(outerShape)
+            .background(Dash.Tile)
+            .border(1.dp, Dash.TileBorder, outerShape)
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        val items = listOf(
+            AppSettings.DisplayMode.ANDROID_AUTO to stringResource(R.string.display_mode_aa),
+            AppSettings.DisplayMode.MIRROR to stringResource(R.string.display_mode_mirror),
+        )
+        items.forEach { (value, label) ->
+            val selected = mode == value
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(38.dp)
+                    .clip(itemShape)
+                    .background(if (selected) Dash.Teal else Color.Transparent)
+                    .clickable { if (!selected) onSelect(value) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    color = if (selected) Color(0xFF0E1014) else Dash.Muted,
+                    fontSize = 13.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+}
+
 /** Minimal 2-segment graphite-silver switch for Wired (USB) vs Wireless (Wi-Fi). */
 @Composable
 fun ConnectionModeSwitch(

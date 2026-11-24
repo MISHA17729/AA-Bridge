@@ -1,11 +1,15 @@
 package dev.caraalink.ui
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.media.projection.MediaProjectionManager
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -62,6 +66,7 @@ import dev.caraalink.service.UsbLinkForegroundService
 import dev.caraalink.settings.AppSettings
 import dev.caraalink.ui.theme.Dash
 import dev.caraalink.usb.UsbCableConnector
+import dev.caraalink.video.PhoneMirrorController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -163,11 +168,42 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
     val serverRunning = rememberServerRunning()
     val connection = rememberConnection()
     val carConnected = connection.phase.isCarConnected()
-    val state = homeState(serverRunning, carConnected, connection.wireless)
+    var displayMode by remember { mutableStateOf(AppSettings.displayMode(context)) }
+    val mirrorMode = displayMode == AppSettings.DisplayMode.MIRROR
+    val state = homeState(serverRunning, carConnected, connection.wireless, mirrorMode = mirrorMode)
     val searchName = carToRetry(connection, AppSettings.wirelessCar(context))?.name
     val carName = connection.carName ?: searchName ?: stringResource(R.string.state_connected)
     var connectionMode by remember { mutableStateOf(AppSettings.connectionMode(context)) }
     var prevServerRunning by remember { mutableStateOf(serverRunning) }
+    var pendingMirrorAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    val mirrorPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            PhoneMirrorController.setPermission(result.resultCode, result.data)
+            val action = pendingMirrorAction
+            pendingMirrorAction = null
+            action?.invoke()
+        } else {
+            pendingMirrorAction = null
+            Toast.makeText(context, context.getString(R.string.mirror_permission_denied), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun launchWithMirrorCheck(afterGranted: () -> Unit) {
+        if (!mirrorMode || PhoneMirrorController.hasPermission()) {
+            afterGranted()
+            return
+        }
+        val mpm = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
+        if (mpm == null) {
+            Toast.makeText(context, context.getString(R.string.mirror_permission_denied), Toast.LENGTH_SHORT).show()
+            return
+        }
+        pendingMirrorAction = afterGranted
+        mirrorPermissionLauncher.launch(mpm.createScreenCaptureIntent())
+    }
 
     // Keep UI switch synced if a physical USB cable connects.
     LaunchedEffect(connection.link, carConnected) {
@@ -180,12 +216,11 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
         }
     }
 
-    // Auto-start the chosen connection right when the server comes online, so the user
-    // doesn't have to bounce back and forth between Android Auto settings and Geely Link.
-    LaunchedEffect(serverRunning, connectionMode) {
+    // Auto-start the chosen connection right when the server comes online in Android Auto mode.
+    LaunchedEffect(serverRunning, connectionMode, mirrorMode) {
         val justStarted = serverRunning && !prevServerRunning
         prevServerRunning = serverRunning
-        if (justStarted && !carConnected) {
+        if (!mirrorMode && justStarted && !carConnected) {
             if (connectionMode == AppSettings.ConnectionMode.CABLE) {
                 connectByCable(context, silentIfMissing = true)
             } else {
@@ -235,7 +270,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
         ) {
-            Spacer(Modifier.height(22.dp))
+            Spacer(Modifier.height(20.dp))
 
             val statusDot = when (state) {
                 HomeState.CONNECTED -> Dash.Success
@@ -261,7 +296,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
             Spacer(Modifier.height(10.dp))
 
             val title = when (state) {
-                HomeState.READY -> stringResource(R.string.home_ready_title)
+                HomeState.READY -> if (mirrorMode) stringResource(R.string.home_mirror_ready_title) else stringResource(R.string.home_ready_title)
                 HomeState.NEEDS_TAP -> stringResource(R.string.home_needs_tap_title)
                 HomeState.CONNECTED -> carName
                 HomeState.SEARCHING, HomeState.CONNECTING -> searchName ?: stringResource(R.string.nearby_your_car)
@@ -273,13 +308,13 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                 HomeState.WIFI_OFF -> stringResource(R.string.home_wifi_off_title)
             }
             val body = when (state) {
-                HomeState.READY -> if (connectionMode == AppSettings.ConnectionMode.CABLE) {
-                    R.string.home_ready_body_wired
-                } else {
-                    R.string.home_ready_body_wireless
+                HomeState.READY -> when {
+                    mirrorMode -> R.string.home_mirror_ready_body
+                    connectionMode == AppSettings.ConnectionMode.CABLE -> R.string.home_ready_body_wired
+                    else -> R.string.home_ready_body_wireless
                 }
                 HomeState.NEEDS_TAP -> R.string.home_needs_tap_body
-                HomeState.CONNECTED -> R.string.home_connected_body
+                HomeState.CONNECTED -> if (mirrorMode) R.string.home_mirror_connected_body else R.string.home_connected_body
                 HomeState.SEARCHING -> R.string.home_searching_body
                 HomeState.CONNECTING -> R.string.home_connecting_body
                 HomeState.NOT_FOUND -> R.string.home_not_found_body
@@ -290,7 +325,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
             Text(stringResource(body), style = MaterialTheme.typography.bodyLarge, color = Dash.Muted)
 
             if (state == HomeState.SEARCHING || state == HomeState.CONNECTING) {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(14.dp))
                 LinearProgressIndicator(
                     modifier = Modifier.fillMaxWidth().height(2.dp).clip(RoundedCornerShape(1.dp)),
                     color = Dash.Teal,
@@ -298,7 +333,20 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                 )
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(18.dp))
+
+            DisplayModeSwitch(
+                mode = displayMode,
+                onSelect = { newDisplay ->
+                    displayMode = newDisplay
+                    AppSettings.setDisplayMode(context, newDisplay)
+                    if (carConnected) {
+                        stopLink(context)
+                    }
+                },
+            )
+
+            Spacer(Modifier.height(10.dp))
 
             ConnectionModeSwitch(
                 mode = connectionMode,
@@ -313,8 +361,12 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                         ) {
                             stopLink(context)
                         }
-                        if (serverRunning && !carConnected) {
-                            connectByCable(context, silentIfMissing = true)
+                        if ((mirrorMode || serverRunning) && !carConnected) {
+                            if (mirrorMode) {
+                                launchWithMirrorCheck { connectByCable(context, silentIfMissing = true) }
+                            } else {
+                                connectByCable(context, silentIfMissing = true)
+                            }
                         }
                     }
                 },
@@ -341,11 +393,20 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                     .background(Dash.Tile)
                     .border(1.dp, Dash.TileBorder, panelShape),
             ) {
-                InstrumentRow(
-                    label = stringResource(R.string.row_server),
-                    value = stringResource(if (serverRunning) R.string.state_running else R.string.state_off),
-                    lamp = if (serverRunning) Lamp.ON else Lamp.ALERT,
-                )
+                if (mirrorMode) {
+                    val touchReady = AaServerAccessibilityService.isServiceEnabled(context)
+                    InstrumentRow(
+                        label = stringResource(R.string.row_mirror_touch),
+                        value = stringResource(if (touchReady) R.string.state_ready else R.string.state_off),
+                        lamp = if (touchReady) Lamp.ON else Lamp.ALERT,
+                    )
+                } else {
+                    InstrumentRow(
+                        label = stringResource(R.string.row_server),
+                        value = stringResource(if (serverRunning) R.string.state_running else R.string.state_off),
+                        lamp = if (serverRunning) Lamp.ON else Lamp.ALERT,
+                    )
+                }
                 HorizontalDivider(thickness = 1.dp, color = Dash.TileBorder)
                 InstrumentRow(
                     label = stringResource(R.string.tile_link),
@@ -358,7 +419,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                     value = if (carConnected) carName else stringResource(R.string.state_not_connected),
                     lamp = if (carConnected) Lamp.ON else Lamp.OFF,
                 )
-                if (serverRunning && !carConnected) {
+                if (!mirrorMode && serverRunning && !carConnected) {
                     idleRemainingMin?.let { mins ->
                         HorizontalDivider(thickness = 1.dp, color = Dash.TileBorder)
                         Row(
@@ -378,7 +439,9 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
             if (state == HomeState.NOT_FOUND) {
                 connection.suggestion?.let { found ->
                     Spacer(Modifier.height(14.dp))
-                    SuggestionTile(found.name) { startWireless(context, found.address, found.name) }
+                    SuggestionTile(found.name) {
+                        launchWithMirrorCheck { startWireless(context, found.address, found.name) }
+                    }
                 }
             }
 
@@ -392,7 +455,16 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
                 .padding(bottom = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            HomeActions(state, connectionMode, serverRunning, carConnected, connection, onOpenNearby)
+            HomeActions(
+                state = state,
+                displayMode = displayMode,
+                connectionMode = connectionMode,
+                serverRunning = serverRunning,
+                carConnected = carConnected,
+                connection = connection,
+                onOpenNearby = { launchWithMirrorCheck(onOpenNearby) },
+                onLaunchConnect = { action -> launchWithMirrorCheck(action) },
+            )
             SendLogsLink()
         }
     }
@@ -402,31 +474,38 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenNearby: () -> Unit) {
 @Composable
 private fun HomeActions(
     state: HomeState,
+    displayMode: AppSettings.DisplayMode,
     connectionMode: AppSettings.ConnectionMode,
     serverRunning: Boolean,
     carConnected: Boolean,
     connection: ConnectionSnapshot,
     onOpenNearby: () -> Unit,
+    onLaunchConnect: (() -> Unit) -> Unit,
 ) {
     val context = LocalContext.current
+    val mirrorMode = displayMode == AppSettings.DisplayMode.MIRROR
     when (state) {
         HomeState.READY -> {
             if (connectionMode == AppSettings.ConnectionMode.CABLE) {
-                GlowButton(stringResource(R.string.home_connect_wired), { connectByCable(context) })
+                val label = stringResource(if (mirrorMode) R.string.home_start_mirror_wired else R.string.home_connect_wired)
+                GlowButton(label, { onLaunchConnect { connectByCable(context) } })
             } else {
                 val remembered = AppSettings.wirelessCar(context)
+                val label = stringResource(if (mirrorMode) R.string.home_start_mirror_wireless else R.string.home_connect_wireless)
                 if (remembered != null) {
-                    GlowButton(stringResource(R.string.home_connect_wireless), {
-                        startWireless(context, remembered.address, remembered.name)
+                    GlowButton(label, {
+                        onLaunchConnect { startWireless(context, remembered.address, remembered.name) }
                     })
                 } else {
-                    GlowButton(stringResource(R.string.home_connect_wireless), onOpenNearby)
+                    GlowButton(label, onOpenNearby)
                 }
             }
-            Spacer(Modifier.height(10.dp))
-            SecondaryButton(stringResource(R.string.home_stop_server), {
-                toggleHeadUnitServer(context, AaServerAccessibilityService.Action.STOP)
-            })
+            if (!mirrorMode) {
+                Spacer(Modifier.height(10.dp))
+                SecondaryButton(stringResource(R.string.home_stop_server), {
+                    toggleHeadUnitServer(context, AaServerAccessibilityService.Action.STOP)
+                })
+            }
             if (connectionMode == AppSettings.ConnectionMode.WIRELESS && AppSettings.wirelessCar(context) != null) {
                 Spacer(Modifier.height(4.dp))
                 DashLink(stringResource(R.string.home_choose_car), onOpenNearby)
@@ -450,13 +529,13 @@ private fun HomeActions(
         }
         HomeState.NOT_FOUND -> {
             if (connectionMode == AppSettings.ConnectionMode.CABLE) {
-                GlowButton(stringResource(R.string.home_connect_wired), { connectByCable(context) })
+                GlowButton(stringResource(R.string.home_connect_wired), { onLaunchConnect { connectByCable(context) } })
             } else {
-                GlowButton(stringResource(R.string.home_try_again), { retryWireless(context, connection) })
+                GlowButton(stringResource(R.string.home_try_again), { onLaunchConnect { retryWireless(context, connection) } })
                 Spacer(Modifier.height(10.dp))
                 SecondaryButton(stringResource(R.string.home_choose_car), onOpenNearby)
             }
-            if (serverRunning && !carConnected) {
+            if (!mirrorMode && serverRunning && !carConnected) {
                 Spacer(Modifier.height(6.dp))
                 DashLink(stringResource(R.string.home_stop_server)) {
                     toggleHeadUnitServer(context, AaServerAccessibilityService.Action.STOP)
@@ -465,13 +544,13 @@ private fun HomeActions(
         }
         HomeState.WIFI_OFF -> {
             if (connectionMode == AppSettings.ConnectionMode.CABLE) {
-                GlowButton(stringResource(R.string.home_connect_wired), { connectByCable(context) })
+                GlowButton(stringResource(R.string.home_connect_wired), { onLaunchConnect { connectByCable(context) } })
             } else {
                 AmberButton(stringResource(R.string.home_wifi_settings), { context.startActivity(Intent(Settings.Panel.ACTION_WIFI)) })
                 Spacer(Modifier.height(10.dp))
-                SecondaryButton(stringResource(R.string.home_try_again), { retryWireless(context, connection) })
+                SecondaryButton(stringResource(R.string.home_try_again), { onLaunchConnect { retryWireless(context, connection) } })
             }
-            if (serverRunning && !carConnected) {
+            if (!mirrorMode && serverRunning && !carConnected) {
                 Spacer(Modifier.height(6.dp))
                 DashLink(stringResource(R.string.home_stop_server)) {
                     toggleHeadUnitServer(context, AaServerAccessibilityService.Action.STOP)

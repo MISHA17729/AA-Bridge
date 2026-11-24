@@ -168,7 +168,18 @@
     <string name="pref_crash_log_summary">Save crash details to Downloads if the app crashes</string>
     <string name="pref_dev_tools_title">Developer tools</string>
     <string name="pref_dev_tools_summary">Log export and on-phone car preview</string>
+    <string name="display_mode_aa">Android Auto</string>
+    <string name="display_mode_mirror">Screen Mirror</string>
+    <string name="home_mirror_ready_title">Screen mirror ready</string>
+    <string name="home_mirror_ready_body">Mirrors your phone screen with car touch control. Android Auto server is not required.</string>
+    <string name="home_mirror_connected_body">Phone screen is mirrored on your car display.</string>
+    <string name="home_start_mirror_wired">Start mirror via USB</string>
+    <string name="home_start_mirror_wireless">Start mirror via Wi-Fi</string>
+    <string name="row_mirror_touch">Car touch control</string>
+    <string name="state_ready">Ready</string>
+    <string name="mirror_permission_denied">Screen capture permission is required for Mirror mode</string>
 </resources>
+
 
 
 
